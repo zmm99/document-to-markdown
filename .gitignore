@@ -9,3 +9,7 @@ data/
 *.egg-info/
 build/
 dist/
+tmp/
+.pytest_tmp*/
+pytest-cache-files-*/
+tests/_tmp/
