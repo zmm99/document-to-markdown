@@ -30,8 +30,8 @@ v1.0 支持以下数字文档格式：
 | 文件类型 | 扩展名 | 处理方式 |
 | --- | --- | --- |
 | PDF | `.pdf` | 使用 Docling 转换，仅支持可复制文字的 PDF |
-| Word | `.docx` | 使用 Docling 或 Pandoc 转换 |
-| PowerPoint | `.pptx` | 使用 Docling 或 MarkItDown 转换 |
+| Word | `.docx` | 使用 Docling 转换 |
+| PowerPoint | `.pptx` | 使用 Docling 转换 |
 | Excel | `.xlsx` | 使用 openpyxl 自定义转 Markdown 表格 |
 | CSV | `.csv` | 使用 Python 标准库自定义转 Markdown 表格 |
 | HTML | `.html`, `.htm` | 使用 BeautifulSoup 或 Pandoc 转换 |
@@ -54,7 +54,7 @@ v1.0 支持以下数字文档格式：
 | API 服务 | FastAPI |
 | 数据库 | SQLite |
 | 文件存储 | 本地目录 |
-| PDF/DOCX/PPTX 转换 | Docling 优先，必要时接入 MarkItDown 或 Pandoc |
+| PDF/DOCX/PPTX 转换 | Docling，作为 v1.0 必选依赖 |
 | XLSX 转换 | openpyxl |
 | CSV 转换 | Python csv 标准库 |
 | HTML 转换 | BeautifulSoup 或 Pandoc |

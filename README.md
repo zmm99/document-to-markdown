@@ -10,7 +10,7 @@ Current v1.0 scope:
 - md5-based file id.
 - Basic file validation and storage helpers.
 - Basic converters for TXT, Markdown, CSV, XLSX, and HTML.
-- Optional Docling converter entry for PDF, DOCX, and PPTX.
+- Docling-based converters for PDF, DOCX, and PPTX.
 
 OCR, async queues, and object storage are implemented in later phases.
 
@@ -21,10 +21,18 @@ python.exe -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
-Install Docling support when PDF, DOCX, or PPTX conversion is needed:
+## Docling Models
+
+PDF conversion uses Docling layout models. Prefetch them before running the service in production or offline environments:
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[docling]"
+.\.venv\Scripts\docling-tools.exe models download --output-dir ./models/docling
+```
+
+Then configure:
+
+```powershell
+DOCLING_ARTIFACTS_PATH=./models/docling
 ```
 
 ## Run Checks

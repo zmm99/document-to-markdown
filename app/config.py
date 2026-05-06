@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     max_upload_size_mb: int = 100
     api_prefix: str = "/api"
+    docling_artifacts_path: Path | None = None
+
+    @field_validator("docling_artifacts_path", mode="before")
+    @classmethod
+    def validate_docling_artifacts_path(cls, value: str | None) -> str | None:
+        if value == "":
+            return None
+        return value
 
     @field_validator("api_prefix")
     @classmethod

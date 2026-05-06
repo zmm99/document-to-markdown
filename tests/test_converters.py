@@ -102,6 +102,12 @@ def test_registry_docling_formats() -> None:
     assert get_converter("pptx").engine == "docling"
 
 
+def test_docling_dependency_available() -> None:
+    import docling
+
+    assert docling is not None
+
+
 def test_registry_unsupported_format() -> None:
     with pytest.raises(ConversionError) as exc:
         get_converter("png")
