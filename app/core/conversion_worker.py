@@ -52,7 +52,7 @@ def run(file_format: str, input_path: Path, output_dir: Path, result_path: Path)
             {
                 "status": "conversion_error",
                 "error_code": "convert_failed",
-                "message": "document conversion failed",
+                "message": "文档转换失败",
             },
         )
         return 0

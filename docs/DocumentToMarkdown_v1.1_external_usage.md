@@ -63,7 +63,7 @@ ADMIN_PASSWORD=admin
 1. 调用 `POST /api/tasks/convert` 上传文件，获得 `task_id` 和 `file_id`。
 2. 每 1 到 3 秒调用 `GET /api/tasks/{task_id}` 查询状态和进度。
 3. 当任务状态为 `success` 时，从 `result.markdown_url` 获取 Markdown，或从 `result.download_url` 下载压缩包。
-4. 当任务状态为 `failed` 或 `timeout` 时，记录 `error` 并按业务策略重试或提示人工处理。
+4. 当任务状态为 `failed` 或 `timeout` 时，记录 `error_code` 和 `error_message` 并按业务策略重试或提示人工处理。
 
 状态流转：
 
@@ -91,7 +91,8 @@ queued -> cancelled
 | --- | --- | --- |
 | `progress` | integer | 0 到 100 的进度值 |
 | `stage` | string | 当前阶段，例如 `queued`、`converting`、`completed` |
-| `message` | string | 当前阶段描述 |
+| `stage_text` | string | 当前阶段中文描述 |
+| `message` | string | 当前阶段中文描述 |
 
 ## 开放接口清单
 
@@ -135,19 +136,22 @@ curl -X POST "http://127.0.0.1:9527/api/tasks/convert" \
 ```json
 {
   "status": "queued",
+  "status_text": "排队中",
   "task_id": "1789158229000000001",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 10,
   "stage": "queued",
-  "message": "task is waiting for conversion",
+  "stage_text": "排队中",
+  "message": "任务等待转换",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:00",
   "started_at": null,
   "finished_at": null,
   "result": null,
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -156,15 +160,18 @@ curl -X POST "http://127.0.0.1:9527/api/tasks/convert" \
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "task_id": null,
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 100,
   "stage": "completed",
-  "message": "document conversion completed from cache",
+  "stage_text": "已完成",
+  "message": "命中缓存，转换完成",
   "result": {
     "status": "success",
+    "status_text": "成功",
     "file_id": "1789158229000000000",
     "file_format": "pdf",
     "cached": true,
@@ -174,7 +181,8 @@ curl -X POST "http://127.0.0.1:9527/api/tasks/convert" \
     "metadata": {},
     "warnings": []
   },
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -193,19 +201,22 @@ curl "http://127.0.0.1:9527/api/tasks/1789158229000000001"
 ```json
 {
   "status": "running",
+  "status_text": "转换中",
   "task_id": "1789158229000000001",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 40,
   "stage": "converting",
-  "message": "document conversion started",
+  "stage_text": "转换中",
+  "message": "开始转换文档",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:03",
   "started_at": "2026-05-08 14:30:01",
   "finished_at": null,
   "result": null,
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -214,19 +225,22 @@ curl "http://127.0.0.1:9527/api/tasks/1789158229000000001"
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "task_id": "1789158229000000001",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 100,
   "stage": "completed",
-  "message": "document conversion completed",
+  "stage_text": "已完成",
+  "message": "文档转换完成",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:10",
   "started_at": "2026-05-08 14:30:01",
   "finished_at": "2026-05-08 14:30:10",
   "result": {
     "status": "success",
+    "status_text": "成功",
     "file_id": "1789158229000000000",
     "file_format": "pdf",
     "cached": false,
@@ -242,7 +256,8 @@ curl "http://127.0.0.1:9527/api/tasks/1789158229000000001"
     "metadata": {},
     "warnings": []
   },
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -251,15 +266,15 @@ curl "http://127.0.0.1:9527/api/tasks/1789158229000000001"
 ```json
 {
   "status": "failed",
+  "status_text": "失败",
   "task_id": "1789158229000000001",
   "progress": 100,
   "stage": "failed",
-  "message": "document conversion failed",
+  "stage_text": "失败",
+  "message": "文档转换失败",
   "result": null,
-  "error": {
-    "error_code": "convert_failed",
-    "message": "document conversion failed"
-  }
+  "error_code": "convert_failed",
+  "error_message": "文档转换失败"
 }
 ```
 
@@ -280,11 +295,11 @@ curl "http://127.0.0.1:9527/api/documents/1789158229000000000"
 | 字段 | 说明 |
 | --- | --- |
 | `file_id` | 文档 ID |
-| `file_name` | 原始文件名 |
+| `original_filename` | 原始文件名 |
 | `file_format` | 文件格式 |
 | `file_size` | 文件大小，单位字节 |
-| `content_md5` | 文件内容 MD5，用于识别相同内容 |
-| `last_status` | 最近一次转换状态 |
+| `status` | 最近一次转换状态 |
+| `status_text` | 最近一次转换状态中文描述 |
 | `markdown_url` | Markdown 获取地址 |
 | `download_url` | Markdown 压缩包下载地址 |
 | `original_url` | 原始文件下载地址 |
@@ -404,7 +419,7 @@ def convert_document(path: str) -> dict:
             return task["result"]
 
         if task["status"] in {"failed", "timeout", "cancelled"}:
-            raise RuntimeError(task.get("error") or task.get("message"))
+            raise RuntimeError(task.get("error_message") or task.get("message"))
 
         time.sleep(2)
 
@@ -422,8 +437,9 @@ print(markdown[:500])
 {
   "detail": {
     "status": "failed",
+    "status_text": "失败",
     "error_code": "unsupported_file_format",
-    "message": "unsupported file format: .exe"
+    "message": "不支持的文件格式"
   }
 }
 ```

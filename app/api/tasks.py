@@ -19,6 +19,7 @@ from app.core.file_utils import (
     validate_task_id,
 )
 from app.core.id_generator import generate_file_id
+from app.core.response_text import api_error_detail, stage_text, status_text, translate_message
 from app.core.storage import storage_manager
 from app.core.task_queue import task_queue
 from app.core.uploads import save_upload_to_temp
@@ -44,14 +45,9 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 def raise_api_error(status_code: int, error_code: str, message: str) -> None:
-    response_status = "unsupported" if error_code == "unsupported_file_format" else "failed"
     raise HTTPException(
         status_code=status_code,
-        detail={
-            "status": response_status,
-            "error_code": error_code,
-            "message": message,
-        },
+        detail=api_error_detail(error_code, message),
     )
 
 
@@ -88,9 +84,11 @@ def task_response(task: dict[str, Any]) -> dict[str, Any]:
     response: dict[str, Any] = {
         "task_id": task["task_id"],
         "status": task["status"],
+        "status_text": status_text(task["status"]),
         "progress": task["progress"],
         "stage": task["stage"],
-        "message": task["message"],
+        "stage_text": stage_text(task["stage"]),
+        "message": translate_message(task["message"], task.get("error_code")),
         "file_id": file_id,
         "original_filename": task["original_filename"],
         "file_format": task["file_format"],
@@ -100,7 +98,7 @@ def task_response(task: dict[str, Any]) -> dict[str, Any]:
         "markdown_url": f"{settings.api_prefix}/documents/{file_id}/markdown" if file_id else None,
         "download_url": f"{settings.api_prefix}/documents/{file_id}/download" if file_id else None,
         "error_code": task.get("error_code"),
-        "error_message": task.get("error_message"),
+        "error_message": translate_message(task.get("error_message"), task.get("error_code")),
         "created_at": task.get("created_at"),
         "started_at": task.get("started_at"),
         "finished_at": task.get("finished_at"),
@@ -133,7 +131,7 @@ def create_success_task(
                 "status": "success",
                 "progress": 100,
                 "stage": "completed",
-                "message": "document conversion completed from cache",
+                "message": "命中缓存，转换完成",
                 "cached": cached,
                 "started_at": now,
                 "finished_at": now,
@@ -148,7 +146,7 @@ def create_queued_task_for_document(
     file_id: str,
     original_filename: str,
     file_format: str,
-    message: str = "task is waiting for conversion",
+    message: str = "任务等待转换",
 ) -> dict[str, Any]:
     task_id = generate_file_id()
     with get_connection() as conn:
@@ -174,7 +172,7 @@ def create_queued_task_for_document(
 @router.post("/convert")
 async def create_conversion_task(file: UploadFile | None = File(default=None)) -> JSONResponse:
     if file is None:
-        raise_api_error(status.HTTP_400_BAD_REQUEST, "empty_file", "file is required")
+        raise_api_error(status.HTTP_400_BAD_REQUEST, "empty_file", "请上传文件")
 
     temp_path: Path | None = None
     try:
@@ -214,7 +212,7 @@ async def create_conversion_task(file: UploadFile | None = File(default=None)) -
         raise_api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "upload_save_failed",
-            "failed to save uploaded file",
+            "上传文件保存失败",
         )
 
     task_id = generate_file_id()
@@ -242,7 +240,7 @@ async def create_conversion_task(file: UploadFile | None = File(default=None)) -
                 "status": "queued",
                 "progress": 10,
                 "stage": "queued",
-                "message": "task is waiting for conversion",
+                "message": "任务等待转换",
                 "cached": False,
             },
         )
@@ -269,7 +267,7 @@ def list_tasks(
         raise_api_error(
             status.HTTP_400_BAD_REQUEST,
             "invalid_date_range",
-            "date range is invalid",
+            "日期范围不合法",
         )
 
     with get_connection() as conn:
@@ -291,6 +289,8 @@ def list_tasks(
         )
 
     return {
+        "status": "success",
+        "status_text": status_text("success"),
         "items": [task_response(task) for task in tasks],
         "total": total,
         "limit": limit,
@@ -309,7 +309,7 @@ def get_task(task_id: str) -> dict[str, Any]:
         task = get_conversion_task(conn, safe_task_id)
 
     if task is None:
-        raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "task not found")
+        raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "任务不存在")
 
     return task_response(task)
 
@@ -327,12 +327,12 @@ def cancel_task(
     with get_connection() as conn:
         task = get_conversion_task(conn, safe_task_id)
         if task is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "task not found")
+            raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "任务不存在")
         if task["status"] != "queued":
             raise_api_error(
                 status.HTTP_409_CONFLICT,
                 "task_not_cancellable",
-                "only queued tasks can be cancelled",
+                "只有排队中的任务可以取消",
             )
         cancel_queued_task(conn, safe_task_id)
         conn.commit()
@@ -354,12 +354,12 @@ async def retry_task(
     with get_connection() as conn:
         task = get_conversion_task(conn, safe_task_id)
     if task is None:
-        raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "task not found")
+        raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "任务不存在")
     if task["status"] in {"queued", "running"}:
         raise_api_error(
             status.HTTP_409_CONFLICT,
             "task_not_retryable",
-            "queued or running tasks cannot be retried",
+            "排队中或转换中的任务不能重试",
         )
 
     stored = stored_upload_from_document(task.get("file_id"))
@@ -367,14 +367,14 @@ async def retry_task(
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "upload_not_found",
-            "uploaded file not found",
+            "原始文件不存在",
         )
 
     new_task = create_queued_task_for_document(
         stored.file_id,
         stored.original_filename,
         stored.file_format,
-        message="retry task is waiting for conversion",
+        message="重试任务等待转换",
     )
     await task_queue.enqueue(new_task["task_id"])
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=task_response(new_task))
@@ -393,12 +393,12 @@ def delete_task(
     with get_connection() as conn:
         task = get_conversion_task(conn, safe_task_id)
         if task is None:
-            raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "task not found")
+            raise_api_error(status.HTTP_404_NOT_FOUND, "task_not_found", "任务不存在")
         if task["status"] == "running":
             raise_api_error(
                 status.HTTP_409_CONFLICT,
                 "task_is_running",
-                "running task cannot be deleted",
+                "运行中的任务不能删除",
             )
         if task["status"] == "queued":
             update_conversion_task(
@@ -408,7 +408,7 @@ def delete_task(
                     "status": "cancelled",
                     "progress": 100,
                     "stage": "cancelled",
-                    "message": "task was cancelled before deletion",
+                    "message": "任务删除前已取消",
                     "finished_at": beijing_now(),
                 },
             )
@@ -417,6 +417,7 @@ def delete_task(
 
     return {
         "status": "success",
+        "status_text": status_text("success"),
         "deleted_task_id": safe_task_id,
         "deleted_tasks": deleted,
     }

@@ -144,13 +144,19 @@ def test_async_convert_txt_status_result_and_open_document_access(client: TestCl
     assert response.status_code == 202
     created = response.json()
     assert created["status"] == "queued"
+    assert created["status_text"] == "排队中"
     assert created["progress"] == 10
+    assert created["stage_text"] == "排队中"
+    assert created["message"] == "任务等待转换"
     assert created["status_url"] == f"/api/tasks/{created['task_id']}"
 
     task = wait_for_task(client, created["task_id"])
     assert task["status"] == "success"
+    assert task["status_text"] == "成功"
     assert task["progress"] == 100
     assert task["stage"] == "completed"
+    assert task["stage_text"] == "已完成"
+    assert task["message"] == "文档转换完成"
     assert task["cached"] is False
     assert task["result"]["status"] == "success"
     assert task["result"]["file_id"] == task["file_id"]

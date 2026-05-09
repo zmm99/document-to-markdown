@@ -9,6 +9,7 @@ from app.config import settings
 from app.converters.base import ConversionError, write_convert_result
 from app.converters.registry import get_converter
 from app.core.conversion_runner import run_converter_with_timeout
+from app.core.response_text import status_text, translate_warnings
 from app.core.storage import StoredUpload, storage_manager
 from app.db.database import get_connection
 from app.db.repository import (
@@ -45,16 +46,16 @@ def safe_resolve_data_path(relative_path: str | None) -> Path | None:
 def read_metadata(metadata_path: str | None) -> tuple[dict[str, Any], list[str]]:
     path = safe_resolve_data_path(metadata_path)
     if path is None or not path.exists() or not path.is_file():
-        return {}, ["metadata is unavailable"]
+        return {}, ["元数据不可用"]
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-        return {}, ["metadata is unavailable"]
+        return {}, ["元数据不可用"]
 
     warnings = data.pop("warnings", [])
     data.pop("assets", None)
-    return data, warnings
+    return data, translate_warnings(warnings)
 
 
 def is_parse_cache_usable(
@@ -101,6 +102,7 @@ def success_response(
     response: dict[str, Any] = {
         "file_id": document_id,
         "status": "success",
+        "status_text": status_text("success"),
         "file_format": file_format,
         "markdown_url": document_url(document_id, "markdown"),
         "download_url": document_url(document_id, "download"),
@@ -207,9 +209,9 @@ async def convert_stored_document(stored: StoredUpload) -> DocumentConversionRes
             engine,
             stored.output_dir,
             "convert_failed",
-            "document conversion failed",
+            "文档转换失败",
         )
-        raise ConversionError("convert_failed", "document conversion failed") from exc
+        raise ConversionError("convert_failed", "文档转换失败") from exc
 
     with get_connection() as conn:
         parse_record_id = insert_parse_record(

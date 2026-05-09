@@ -25,6 +25,13 @@ from app.core.file_utils import (
     validate_filename_and_format,
 )
 from app.core.id_generator import generate_file_id
+from app.core.response_text import (
+    api_error_detail,
+    stage_text,
+    status_text,
+    translate_message,
+    translate_warnings,
+)
 from app.core.storage import storage_manager
 from app.core.task_queue import task_queue
 from app.db.database import get_connection
@@ -57,14 +64,9 @@ UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def raise_api_error(status_code: int, error_code: str, message: str) -> None:
-    response_status = "unsupported" if error_code == "unsupported_file_format" else "failed"
     raise HTTPException(
         status_code=status_code,
-        detail={
-            "status": response_status,
-            "error_code": error_code,
-            "message": message,
-        },
+        detail=api_error_detail(error_code, message),
     )
 
 
@@ -86,7 +88,7 @@ async def save_upload_to_temp(file: UploadFile) -> tuple[Path, str, int]:
             while chunk := await file.read(UPLOAD_CHUNK_SIZE):
                 file_size += len(chunk)
                 if file_size > settings.max_upload_size_bytes:
-                    raise FileValidationError("file_too_large", "file is too large")
+                    raise FileValidationError("file_too_large", "文件超过上传大小限制")
                 digest.update(chunk)
                 output.write(chunk)
 
@@ -109,16 +111,16 @@ def safe_resolve_data_path(relative_path: str | None) -> Path | None:
 def read_metadata(metadata_path: str | None) -> tuple[dict[str, Any], list[str]]:
     path = safe_resolve_data_path(metadata_path)
     if path is None or not path.exists() or not path.is_file():
-        return {}, ["metadata is unavailable"]
+        return {}, ["元数据不可用"]
 
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError, UnicodeDecodeError):
-        return {}, ["metadata is unavailable"]
+        return {}, ["元数据不可用"]
 
     warnings = data.pop("warnings", [])
     data.pop("assets", None)
-    return data, warnings
+    return data, translate_warnings(warnings)
 
 
 def is_parse_cache_usable(
@@ -165,6 +167,7 @@ def success_response(
     response: dict[str, Any] = {
         "file_id": document_id,
         "status": "success",
+        "status_text": status_text("success"),
         "file_format": file_format,
         "markdown_url": document_url(document_id, "markdown"),
         "download_url": document_url(document_id, "download"),
@@ -207,7 +210,7 @@ def resolve_markdown_path(parse_record: dict[str, Any]) -> Path:
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "markdown_not_found",
-            "markdown not found",
+            "Markdown结果不存在",
         )
 
     path = safe_resolve_data_path(markdown_path)
@@ -215,7 +218,7 @@ def resolve_markdown_path(parse_record: dict[str, Any]) -> Path:
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "markdown_not_found",
-            "markdown not found",
+            "Markdown结果不存在",
         )
     return path
 
@@ -223,7 +226,7 @@ def resolve_markdown_path(parse_record: dict[str, Any]) -> Path:
 @router.post("/convert")
 async def convert_document(file: UploadFile | None = File(default=None)) -> dict[str, Any]:
     if file is None:
-        raise_api_error(status.HTTP_400_BAD_REQUEST, "empty_file", "file is required")
+        raise_api_error(status.HTTP_400_BAD_REQUEST, "empty_file", "请上传文件")
 
     temp_path: Path | None = None
     try:
@@ -265,7 +268,7 @@ async def convert_document(file: UploadFile | None = File(default=None)) -> dict
         raise_api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "upload_save_failed",
-            "failed to save uploaded file",
+            "上传文件保存失败",
         )
 
     with get_connection() as conn:
@@ -323,12 +326,12 @@ async def convert_document(file: UploadFile | None = File(default=None)) -> dict
             engine,
             stored.output_dir,
             "convert_failed",
-            "document conversion failed",
+            "文档转换失败",
         )
         raise_api_error(
             status.HTTP_500_INTERNAL_SERVER_ERROR,
             "convert_failed",
-            "document conversion failed",
+            "文档转换失败",
         )
 
     with get_connection() as conn:
@@ -384,12 +387,13 @@ def document_summary_response(document: dict[str, Any]) -> dict[str, Any]:
         "file_size": document["file_size"],
         "storage_date": document["storage_date"],
         "status": parse_status,
+        "status_text": status_text(parse_status),
         "asset_count": int(document.get("asset_count") or 0),
         "original_url": document_url(document_id, "original"),
         "markdown_url": document_url(document_id, "markdown") if has_success else None,
         "download_url": document_url(document_id, "download") if has_success else None,
         "error_code": document.get("latest_error_code"),
-        "error_message": document.get("latest_error_message"),
+        "error_message": translate_message(document.get("latest_error_message"), document.get("latest_error_code")),
         "created_at": document.get("created_at"),
         "updated_at": document.get("updated_at"),
         "latest_parse_created_at": document.get("latest_parse_created_at"),
@@ -420,8 +424,9 @@ def parse_record_response(parse_record: dict[str, Any] | None) -> dict[str, Any]
         "engine": parse_record.get("engine"),
         "engine_version": parse_record.get("engine_version"),
         "status": parse_record.get("status"),
+        "status_text": status_text(parse_record.get("status")),
         "error_code": parse_record.get("error_code"),
-        "error_message": parse_record.get("error_message"),
+        "error_message": translate_message(parse_record.get("error_message"), parse_record.get("error_code")),
         "created_at": parse_record.get("created_at"),
         "updated_at": parse_record.get("updated_at"),
     }
@@ -456,9 +461,11 @@ def queued_task_response(task: dict[str, Any]) -> dict[str, Any]:
     return {
         "task_id": task["task_id"],
         "status": task["status"],
+        "status_text": status_text(task["status"]),
         "progress": task["progress"],
         "stage": task["stage"],
-        "message": task["message"],
+        "stage_text": stage_text(task["stage"]),
+        "message": translate_message(task["message"], task.get("error_code")),
         "file_id": task.get("file_id"),
         "file_format": task["file_format"],
         "original_filename": task["original_filename"],
@@ -476,7 +483,7 @@ def ensure_no_active_document_task(document_id: str) -> None:
         raise_api_error(
             status.HTTP_409_CONFLICT,
             "document_has_active_task",
-            "document has an active conversion task",
+            "文档存在进行中的转换任务",
         )
 
 
@@ -489,7 +496,7 @@ def delete_document_cache_by_id(document_id: str) -> dict[str, Any]:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
         output_dirs = list_parse_output_dirs(conn, document_id)
@@ -503,11 +510,12 @@ def delete_document_cache_by_id(document_id: str) -> dict[str, Any]:
             if storage_manager.delete_output_dir(output_dir):
                 deleted_output_dirs += 1
         except (OSError, ValueError):
-            warnings.append("failed to delete one output directory")
+            warnings.append("有一个输出目录删除失败")
 
     return {
         "file_id": document_id,
         "status": "success",
+        "status_text": status_text("success"),
         "deleted_parse_records": deleted_counts["parse_records"],
         "deleted_assets": deleted_counts["assets"],
         "deleted_output_dirs": deleted_output_dirs,
@@ -531,7 +539,7 @@ def list_document_files(
         raise_api_error(
             status.HTTP_400_BAD_REQUEST,
             "invalid_date_range",
-            "date range is invalid",
+            "日期范围不合法",
         )
 
     with get_connection() as conn:
@@ -553,6 +561,8 @@ def list_document_files(
         )
 
     return {
+        "status": "success",
+        "status_text": status_text("success"),
         "items": [document_summary_response(document) for document in documents],
         "total": total,
         "limit": limit,
@@ -573,7 +583,7 @@ def get_document_info(file_id: str) -> dict[str, Any]:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
         parse_record = get_latest_parse_record(conn, document_id)
@@ -581,6 +591,7 @@ def get_document_info(file_id: str) -> dict[str, Any]:
             return {
                 **document_detail_fields(document),
                 "status": "uploaded",
+                "status_text": status_text("uploaded"),
                 "markdown_url": None,
                 "download_url": None,
                 "assets": [],
@@ -595,13 +606,14 @@ def get_document_info(file_id: str) -> dict[str, Any]:
                 return {
                     **document_detail_fields(document),
                     "status": "failed",
+                    "status_text": status_text("failed"),
                     "markdown_url": None,
                     "download_url": None,
                     "assets": [],
                     "metadata": {},
                     "warnings": [],
                     "error_code": "cache_invalid",
-                    "message": "cached conversion result is invalid",
+                    "message": "缓存转换结果无效",
                     "parse_record": parse_record_response(parse_record),
                 }
             response = success_response(document_id, document["file_format"], parse_record, assets)
@@ -612,13 +624,14 @@ def get_document_info(file_id: str) -> dict[str, Any]:
         return {
             **document_detail_fields(document),
             "status": "failed",
+            "status_text": status_text("failed"),
             "markdown_url": None,
             "download_url": None,
             "assets": [],
             "metadata": {},
             "warnings": [],
             "error_code": parse_record.get("error_code"),
-            "message": parse_record.get("error_message"),
+            "message": translate_message(parse_record.get("error_message"), parse_record.get("error_code")),
             "parse_record": parse_record_response(parse_record),
         }
 
@@ -636,14 +649,14 @@ def get_document_markdown(file_id: str) -> Response:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
         parse_record = get_latest_success_parse(conn, document_id)
         if parse_record is None:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "markdown_not_found",
-                "markdown not found",
+                "Markdown结果不存在",
             )
 
     path = resolve_markdown_path(parse_record)
@@ -666,7 +679,7 @@ def download_original_document(file_id: str) -> FileResponse:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
     path = safe_resolve_data_path(document.get("upload_path"))
@@ -674,7 +687,7 @@ def download_original_document(file_id: str) -> FileResponse:
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "upload_not_found",
-            "uploaded file not found",
+            "原始文件不存在",
         )
 
     media_type = document.get("mime_type") or mimetypes.guess_type(document["original_filename"])[0]
@@ -699,7 +712,7 @@ def get_document_asset_file(file_id: str, asset_name: str) -> FileResponse:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
         asset = get_document_asset(conn, document_id, safe_asset_name)
@@ -707,7 +720,7 @@ def get_document_asset_file(file_id: str, asset_name: str) -> FileResponse:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "asset_not_found",
-                "asset not found",
+                "附件不存在",
             )
 
     path = safe_resolve_data_path(asset.get("asset_path"))
@@ -715,7 +728,7 @@ def get_document_asset_file(file_id: str, asset_name: str) -> FileResponse:
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "asset_not_found",
-            "asset not found",
+            "附件不存在",
         )
 
     media_type = asset.get("content_type") or mimetypes.guess_type(path.name)[0]
@@ -735,7 +748,7 @@ def download_document(file_id: str) -> Response:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
         parse_record = get_latest_success_parse(conn, document_id)
@@ -743,7 +756,7 @@ def download_document(file_id: str) -> Response:
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "markdown_not_found",
-                "markdown not found",
+                "Markdown结果不存在",
             )
         assets = list_document_assets(conn, document_id)
 
@@ -782,7 +795,7 @@ async def reconvert_document(
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
     stored = stored_upload_from_document(document_id)
@@ -790,13 +803,13 @@ async def reconvert_document(
         raise_api_error(
             status.HTTP_404_NOT_FOUND,
             "upload_not_found",
-            "uploaded file not found",
+            "原始文件不存在",
         )
 
     cache_result = delete_document_cache_by_id(document_id)
     task = create_queued_task_for_document(
         document,
-        message="reconvert task is waiting for conversion",
+        message="重新转换任务等待转换",
     )
     await task_queue.enqueue(task["task_id"])
     response = queued_task_response(task)
@@ -835,7 +848,7 @@ def delete_document_file(
             raise_api_error(
                 status.HTTP_404_NOT_FOUND,
                 "document_not_found",
-                "document not found",
+                "文档不存在",
             )
 
         upload_path = document.get("upload_path")
@@ -858,11 +871,12 @@ def delete_document_file(
             if storage_manager.delete_output_dir(output_dir):
                 deleted_output_dirs += 1
         except (OSError, ValueError):
-            warnings.append("failed to delete one output directory")
+            warnings.append("有一个输出目录删除失败")
 
     return {
         "file_id": document_id,
         "status": "success",
+        "status_text": status_text("success"),
         "deleted_documents": deleted_counts["documents"],
         "deleted_parse_records": deleted_counts["parse_records"],
         "deleted_assets": deleted_counts["assets"],

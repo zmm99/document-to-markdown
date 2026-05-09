@@ -30,11 +30,11 @@ class FileValidationError(ValueError):
 
 def normalize_filename(filename: str | None) -> str:
     if filename is None:
-        raise FileValidationError("empty_filename", "filename is required")
+        raise FileValidationError("empty_filename", "文件名不能为空")
 
     normalized = Path(filename).name.strip()
     if not normalized:
-        raise FileValidationError("empty_filename", "filename is required")
+        raise FileValidationError("empty_filename", "文件名不能为空")
 
     return normalized
 
@@ -49,7 +49,7 @@ def get_file_format(filename: str) -> str:
     if file_format is None:
         raise FileValidationError(
             "unsupported_file_format",
-            "unsupported file format",
+            "不支持的文件格式",
         )
     return file_format
 
@@ -63,15 +63,15 @@ def validate_filename_and_format(filename: str | None) -> tuple[str, str, str]:
 
 def validate_file_size(file_size: int, max_size_bytes: int) -> None:
     if file_size <= 0:
-        raise FileValidationError("empty_file", "file is empty")
+        raise FileValidationError("empty_file", "文件内容为空")
     if file_size > max_size_bytes:
-        raise FileValidationError("file_too_large", "file is too large")
+        raise FileValidationError("file_too_large", "文件超过上传大小限制")
 
 
 def build_file_id(md5_value: str) -> str:
     file_id = md5_value.replace("-", "").lower()
     if not MD5_PATTERN.fullmatch(file_id):
-        raise FileValidationError("invalid_file_id", "file_id must be a md5 value")
+        raise FileValidationError("invalid_file_id", "文件ID必须是MD5值")
     return file_id
 
 
@@ -99,25 +99,25 @@ def compute_md5_from_stream(stream: BinaryIO) -> str:
 def validate_file_id(file_id: str) -> str:
     normalized = file_id.replace("-", "").lower()
     if not MD5_PATTERN.fullmatch(normalized) and not SNOWFLAKE_FILE_ID_PATTERN.fullmatch(normalized):
-        raise FileValidationError("invalid_file_id", "file_id is invalid")
+        raise FileValidationError("invalid_file_id", "文件ID不合法")
     return normalized
 
 
 def validate_task_id(task_id: str) -> str:
     normalized = task_id.replace("-", "").lower()
     if not SNOWFLAKE_FILE_ID_PATTERN.fullmatch(normalized):
-        raise FileValidationError("invalid_task_id", "task_id is invalid")
+        raise FileValidationError("invalid_task_id", "任务ID不合法")
     return normalized
 
 
 def validate_asset_name(asset_name: str) -> str:
     if not asset_name:
-        raise FileValidationError("asset_not_found", "asset name is required")
+        raise FileValidationError("asset_not_found", "附件名称不能为空")
 
     if asset_name in {".", ".."}:
-        raise FileValidationError("asset_not_found", "invalid asset name")
+        raise FileValidationError("asset_not_found", "附件名称不合法")
 
     if Path(asset_name).name != asset_name or "/" in asset_name or "\\" in asset_name:
-        raise FileValidationError("asset_not_found", "invalid asset name")
+        raise FileValidationError("asset_not_found", "附件名称不合法")
 
     return asset_name

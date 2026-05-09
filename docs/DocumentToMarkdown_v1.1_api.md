@@ -35,7 +35,8 @@
 
 ```json
 {
-  "status": "success"
+  "status": "success",
+  "status_text": "成功"
 }
 ```
 
@@ -45,8 +46,9 @@
 {
   "detail": {
     "status": "failed",
+    "status_text": "失败",
     "error_code": "convert_failed",
-    "message": "conversion failed"
+    "message": "文档转换失败"
   }
 }
 ```
@@ -91,7 +93,8 @@
 
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "status_text": "正常"
 }
 ```
 
@@ -112,6 +115,7 @@
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "file_id": "1789158229000000000",
   "file_format": "pdf",
   "cached": false,
@@ -161,19 +165,22 @@
 ```json
 {
   "status": "queued",
+  "status_text": "排队中",
   "task_id": "1789158229000000001",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 10,
   "stage": "queued",
-  "message": "queued",
+  "stage_text": "排队中",
+  "message": "任务等待转换",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:00",
   "started_at": null,
   "finished_at": null,
   "result": null,
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -182,19 +189,22 @@
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "task_id": null,
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 100,
   "stage": "completed",
-  "message": "cache hit",
+  "stage_text": "已完成",
+  "message": "命中缓存，转换完成",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:00",
   "started_at": null,
   "finished_at": "2026-05-08 14:30:00",
   "result": {
     "status": "success",
+    "status_text": "成功",
     "file_id": "1789158229000000000",
     "file_format": "pdf",
     "cached": true,
@@ -204,7 +214,8 @@
     "metadata": {},
     "warnings": []
   },
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -236,19 +247,22 @@
 ```json
 {
   "status": "running",
+  "status_text": "转换中",
   "task_id": "1789158229000000001",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
   "progress": 45,
   "stage": "converting",
-  "message": "converting",
+  "stage_text": "转换中",
+  "message": "开始转换文档",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:05",
   "started_at": "2026-05-08 14:30:01",
   "finished_at": null,
   "result": null,
-  "error": null
+  "error_code": null,
+  "error_message": null
 }
 ```
 
@@ -271,15 +285,15 @@
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "file_id": "1789158229000000000",
-  "file_name": "test.pdf",
+  "original_filename": "test.pdf",
   "file_format": "pdf",
+  "mime_type": "application/pdf",
   "file_size": 102400,
-  "content_md5": "8f14e45fceea167a5a36dedd4bea2543",
+  "storage_date": "20260508",
   "created_at": "2026-05-08 14:30:00",
   "updated_at": "2026-05-08 14:30:10",
-  "last_status": "success",
-  "last_error": null,
   "markdown_url": "/api/documents/1789158229000000000/markdown",
   "download_url": "/api/documents/1789158229000000000/download",
   "original_url": "/api/documents/1789158229000000000/original",
@@ -293,6 +307,11 @@
   ],
   "metadata": {
     "page_count": 3
+  },
+  "warnings": [],
+  "parse_record": {
+    "status": "success",
+    "status_text": "成功"
   }
 }
 ```
@@ -364,6 +383,7 @@
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "username": "admin"
 }
 ```
@@ -387,7 +407,8 @@ SESSION_EXPIRE_HOURS=8
 
 ```json
 {
-  "status": "success"
+  "status": "success",
+  "status_text": "成功"
 }
 ```
 
@@ -400,6 +421,7 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "username": "admin"
 }
 ```
@@ -430,16 +452,21 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "total": 1,
   "items": [
     {
       "file_id": "1789158229000000000",
-      "file_name": "test.pdf",
+      "original_filename": "test.pdf",
       "file_format": "pdf",
       "file_size": 102400,
+      "status": "success",
+      "status_text": "成功",
+      "asset_count": 0,
       "created_at": "2026-05-08 14:30:00",
       "updated_at": "2026-05-08 14:30:10",
-      "last_status": "success"
+      "markdown_url": "/api/documents/1789158229000000000/markdown",
+      "download_url": "/api/documents/1789158229000000000/download"
     }
   ]
 }
@@ -456,11 +483,13 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "queued",
+  "status_text": "排队中",
   "task_id": "1789158229000000002",
   "file_id": "1789158229000000000",
   "progress": 10,
   "stage": "queued",
-  "message": "queued"
+  "stage_text": "排队中",
+  "message": "重新转换任务等待转换"
 }
 ```
 
@@ -475,8 +504,12 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "file_id": "1789158229000000000",
-  "deleted_outputs": 1
+  "deleted_parse_records": 1,
+  "deleted_assets": 0,
+  "deleted_output_dirs": 1,
+  "warnings": []
 }
 ```
 
@@ -491,6 +524,7 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "file_id": "1789158229000000000"
 }
 ```
@@ -517,17 +551,20 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
+  "status_text": "成功",
   "total": 1,
   "items": [
     {
       "status": "success",
+      "status_text": "成功",
       "task_id": "1789158229000000001",
       "file_id": "1789158229000000000",
-      "file_name": "test.pdf",
+      "original_filename": "test.pdf",
       "file_format": "pdf",
       "progress": 100,
       "stage": "completed",
-      "message": "completed",
+      "stage_text": "已完成",
+      "message": "文档转换完成",
       "created_at": "2026-05-08 14:30:00",
       "updated_at": "2026-05-08 14:30:10",
       "started_at": "2026-05-08 14:30:01",
@@ -536,7 +573,8 @@ SESSION_EXPIRE_HOURS=8
         "markdown_url": "/api/documents/1789158229000000000/markdown",
         "download_url": "/api/documents/1789158229000000000/download"
       },
-      "error": null
+      "error_code": null,
+      "error_message": null
     }
   ]
 }
@@ -553,10 +591,12 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "cancelled",
+  "status_text": "已取消",
   "task_id": "1789158229000000001",
-  "progress": 10,
+  "progress": 100,
   "stage": "cancelled",
-  "message": "cancelled"
+  "stage_text": "已取消",
+  "message": "任务已取消"
 }
 ```
 
@@ -571,11 +611,13 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "queued",
+  "status_text": "排队中",
   "task_id": "1789158229000000003",
   "file_id": "1789158229000000000",
   "progress": 10,
   "stage": "queued",
-  "message": "queued"
+  "stage_text": "排队中",
+  "message": "重试任务等待转换"
 }
 ```
 
@@ -590,7 +632,9 @@ SESSION_EXPIRE_HOURS=8
 ```json
 {
   "status": "success",
-  "task_id": "1789158229000000001"
+  "status_text": "成功",
+  "deleted_task_id": "1789158229000000001",
+  "deleted_tasks": 1
 }
 ```
 

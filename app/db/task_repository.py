@@ -139,7 +139,7 @@ def mark_task_running(conn: Connection, task_id: str) -> bool:
         SET status = 'running',
             progress = 20,
             stage = 'validating',
-            message = 'file validation completed',
+            message = '文件校验完成',
             started_at = COALESCE(started_at, ?),
             updated_at = ?
         WHERE task_id = ?
@@ -158,7 +158,7 @@ def cancel_queued_task(conn: Connection, task_id: str) -> bool:
         SET status = 'cancelled',
             progress = 100,
             stage = 'cancelled',
-            message = 'task was cancelled',
+            message = '任务已取消',
             finished_at = COALESCE(finished_at, ?),
             updated_at = ?
         WHERE task_id = ?
@@ -171,7 +171,7 @@ def cancel_queued_task(conn: Connection, task_id: str) -> bool:
 
 def mark_unfinished_tasks_failed(
     conn: Connection,
-    message: str = "task was interrupted by service restart",
+    message: str = "服务重启，任务已中断",
 ) -> int:
     now = beijing_now()
     cursor = conn.execute(

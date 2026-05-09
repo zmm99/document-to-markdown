@@ -61,15 +61,15 @@ def _run_converter_in_subprocess(
         )
     except subprocess.TimeoutExpired as exc:
         result_path.unlink(missing_ok=True)
-        raise ConversionError("convert_timeout", "document conversion timed out") from exc
+        raise ConversionError("convert_timeout", "文档转换超时") from exc
 
     if not result_path.exists():
-        raise ConversionError("convert_failed", "document conversion failed")
+        raise ConversionError("convert_failed", "文档转换失败")
 
     try:
         payload = json.loads(result_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as exc:
-        raise ConversionError("convert_failed", "document conversion failed") from exc
+        raise ConversionError("convert_failed", "文档转换失败") from exc
     finally:
         result_path.unlink(missing_ok=True)
 

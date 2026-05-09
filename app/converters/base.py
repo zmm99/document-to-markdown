@@ -39,7 +39,7 @@ def read_text_file(path: Path) -> str:
             return path.read_text(encoding=encoding)
         except UnicodeDecodeError:
             continue
-    raise ConversionError("text_decode_failed", "failed to decode text file")
+    raise ConversionError("text_decode_failed", "文本文件解码失败")
 
 
 def escape_markdown_cell(value: object) -> str:

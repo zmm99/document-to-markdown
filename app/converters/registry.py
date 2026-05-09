@@ -21,5 +21,5 @@ def get_converter(file_format: str) -> Converter:
 
     converter = converters.get(file_format)
     if converter is None:
-        raise ConversionError("unsupported_file_format", "unsupported file format")
+        raise ConversionError("unsupported_file_format", "不支持的文件格式")
     return converter

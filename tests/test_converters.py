@@ -145,7 +145,7 @@ def test_docling_docx_fallback_exports_tables_and_images(monkeypatch) -> None:
     assert result.assets[0].name == "image-001.png"
     assert result.assets[0].path.exists()
     assert result.metadata["fallback_engine"] == "python-docx"
-    assert result.warnings == ["docling failed for docx; used python-docx fallback"]
+    assert result.warnings == ["Docling处理DOCX失败，已使用python-docx兜底转换"]
 
 
 def test_docling_dependency_available() -> None:

@@ -16,7 +16,7 @@ class DoclingConverter:
         try:
             from docling.document_converter import DocumentConverter
         except ImportError as exc:
-            raise ConversionError("converter_dependency_missing", "docling is not installed") from exc
+            raise ConversionError("converter_dependency_missing", "Docling未安装") from exc
 
         try:
             converter = self._create_converter()
@@ -25,7 +25,7 @@ class DoclingConverter:
         except Exception as exc:
             if self.source_format == "docx":
                 return self._convert_docx_with_fallback(input_path, output_dir, exc)
-            raise ConversionError("convert_failed", "docling conversion failed") from exc
+            raise ConversionError("convert_failed", "Docling转换失败") from exc
 
         return ConvertResult(
             markdown=markdown,
@@ -46,7 +46,7 @@ class DoclingConverter:
         try:
             result = DocxConverter().convert(input_path, output_dir)
         except Exception as exc:
-            raise ConversionError("convert_failed", "docx conversion failed") from exc
+            raise ConversionError("convert_failed", "DOCX转换失败") from exc
 
         return ConvertResult(
             markdown=result.markdown,
@@ -56,7 +56,7 @@ class DoclingConverter:
                 "fallback_engine": result.metadata["engine"],
             },
             assets=result.assets,
-            warnings=["docling failed for docx; used python-docx fallback"],
+            warnings=["Docling处理DOCX失败，已使用python-docx兜底转换"],
         )
 
     def _export_markdown_with_assets(self, document, output_dir: Path) -> tuple[str, list[ConvertAsset]]:

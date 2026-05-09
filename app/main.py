@@ -9,6 +9,7 @@ from app.api.documents import router as documents_router
 from app.api.tasks import router as tasks_router
 from app.api.web import WEB_STATIC_DIR, router as web_router
 from app.config import settings
+from app.core.response_text import api_error_detail, status_text
 from app.core.task_queue import task_queue
 from app.db.database import init_db
 
@@ -50,19 +51,13 @@ def create_app() -> FastAPI:
                 if request_size > max_request_size:
                     return JSONResponse(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        content={
-                            "detail": {
-                                "status": "failed",
-                                "error_code": "file_too_large",
-                                "message": "file is too large",
-                            }
-                        },
+                        content={"detail": api_error_detail("file_too_large", "文件超过上传大小限制")},
                     )
         return await call_next(request)
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "status_text": status_text("ok")}
 
     return app
 

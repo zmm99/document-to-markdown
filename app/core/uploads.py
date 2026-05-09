@@ -21,7 +21,7 @@ async def save_upload_to_temp(file: UploadFile) -> tuple[Path, str, int]:
             while chunk := await file.read(UPLOAD_CHUNK_SIZE):
                 file_size += len(chunk)
                 if file_size > settings.max_upload_size_bytes:
-                    raise FileValidationError("file_too_large", "file is too large")
+                    raise FileValidationError("file_too_large", "文件超过上传大小限制")
                 digest.update(chunk)
                 output.write(chunk)
 

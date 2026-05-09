@@ -10,6 +10,7 @@ from app.core.auth import (
     require_admin_session,
     verify_admin_credentials,
 )
+from app.core.response_text import api_error_detail, status_text
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -25,11 +26,7 @@ def login(payload: LoginRequest, response: Response) -> dict[str, str]:
     if not verify_admin_credentials(payload.username, payload.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "status": "failed",
-                "error_code": "invalid_credentials",
-                "message": "username or password is incorrect",
-            },
+            detail=api_error_detail("invalid_credentials", "用户名或密码错误"),
         )
 
     response.set_cookie(
@@ -41,6 +38,7 @@ def login(payload: LoginRequest, response: Response) -> dict[str, str]:
     )
     return {
         "status": "success",
+        "status_text": status_text("success"),
         "username": payload.username,
     }
 
@@ -48,12 +46,13 @@ def login(payload: LoginRequest, response: Response) -> dict[str, str]:
 @router.post("/logout")
 def logout(response: Response) -> dict[str, str]:
     response.delete_cookie(key=SESSION_COOKIE_NAME)
-    return {"status": "success"}
+    return {"status": "success", "status_text": status_text("success")}
 
 
 @router.get("/me")
 def me(session: dict[str, Any] = Depends(require_admin_session)) -> dict[str, str]:
     return {
         "status": "success",
+        "status_text": status_text("success"),
         "username": str(session["username"]),
     }

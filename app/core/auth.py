@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import Cookie, HTTPException, status
 
 from app.config import settings
+from app.core.response_text import api_error_detail
 
 
 SESSION_COOKIE_NAME = "dtm_session"
@@ -82,22 +83,14 @@ def require_admin_session(
     if session_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "status": "failed",
-                "error_code": "unauthorized",
-                "message": "login is required",
-            },
+            detail=api_error_detail("unauthorized", "请先登录"),
         )
 
     session = read_session_token(session_token)
     if session is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "status": "failed",
-                "error_code": "unauthorized",
-                "message": "session is invalid or expired",
-            },
+            detail=api_error_detail("unauthorized", "会话无效或已过期"),
         )
 
     return session

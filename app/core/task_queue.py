@@ -46,7 +46,7 @@ class ConversionTaskQueue:
 
     async def enqueue(self, task_id: str) -> None:
         if self._queue is None:
-            raise RuntimeError("conversion task queue is not running")
+            raise RuntimeError("转换任务队列未启动")
         await self._queue.put(task_id)
 
     async def _worker_loop(self) -> None:
@@ -73,7 +73,7 @@ class ConversionTaskQueue:
             {
                 "progress": 40,
                 "stage": "converting",
-                "message": "document conversion started",
+                "message": "开始转换文档",
             },
         )
 
@@ -82,7 +82,7 @@ class ConversionTaskQueue:
             self._mark_failed(
                 task_id,
                 "upload_not_found",
-                "uploaded file not found",
+                "原始文件不存在",
             )
             return
 
@@ -98,7 +98,7 @@ class ConversionTaskQueue:
             self._mark_failed(
                 task_id,
                 "convert_failed",
-                "document conversion failed",
+                "文档转换失败",
             )
             return
 
@@ -109,7 +109,7 @@ class ConversionTaskQueue:
                 "status": "success",
                 "progress": 100,
                 "stage": "completed",
-                "message": "document conversion completed",
+                "message": "文档转换完成",
                 "cached": result.cached,
                 "error_code": None,
                 "error_message": None,
