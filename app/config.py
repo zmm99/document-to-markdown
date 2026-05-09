@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 100
     api_prefix: str = "/api"
     docling_artifacts_path: Path | None = None
+    convert_timeout_seconds: int = 300
+    max_concurrent_conversions: int = 2
+    admin_username: str = "admin"
+    admin_password: str = "admin123"
+    session_secret: str = "change-me"
+    session_expire_hours: int = 12
+    task_worker_count: int = 1
 
     @field_validator("docling_artifacts_path", mode="before")
     @classmethod
@@ -39,6 +46,34 @@ class Settings(BaseSettings):
     def validate_max_upload_size_mb(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("max_upload_size_mb must be greater than 0")
+        return value
+
+    @field_validator("convert_timeout_seconds")
+    @classmethod
+    def validate_convert_timeout_seconds(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("convert_timeout_seconds must be greater than 0")
+        return value
+
+    @field_validator("max_concurrent_conversions")
+    @classmethod
+    def validate_max_concurrent_conversions(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("max_concurrent_conversions must be greater than 0")
+        return value
+
+    @field_validator("session_expire_hours")
+    @classmethod
+    def validate_session_expire_hours(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("session_expire_hours must be greater than 0")
+        return value
+
+    @field_validator("task_worker_count")
+    @classmethod
+    def validate_task_worker_count(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError("task_worker_count must be greater than 0")
         return value
 
     @property

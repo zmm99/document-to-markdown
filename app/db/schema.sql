@@ -41,3 +41,31 @@ CREATE TABLE IF NOT EXISTS document_assets (
     UNIQUE(document_id, asset_name),
     FOREIGN KEY(document_id) REFERENCES documents(id)
 );
+
+CREATE TABLE IF NOT EXISTS conversion_tasks (
+    task_id TEXT PRIMARY KEY,
+    file_id TEXT,
+    original_filename TEXT NOT NULL,
+    file_format TEXT NOT NULL,
+    status TEXT NOT NULL,
+    progress INTEGER NOT NULL DEFAULT 0,
+    stage TEXT NOT NULL DEFAULT 'created',
+    message TEXT NOT NULL DEFAULT '',
+    error_code TEXT,
+    error_message TEXT,
+    cached INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    finished_at TEXT,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(file_id) REFERENCES documents(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversion_tasks_status
+ON conversion_tasks(status);
+
+CREATE INDEX IF NOT EXISTS idx_conversion_tasks_file_id
+ON conversion_tasks(file_id);
+
+CREATE INDEX IF NOT EXISTS idx_conversion_tasks_created_at
+ON conversion_tasks(created_at);

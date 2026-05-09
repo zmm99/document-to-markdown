@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 
 from app.converters.base import ConversionError, write_convert_result
+from app.converters.docling_converter import DoclingConverter
 from app.converters.registry import get_converter
 
 
@@ -100,6 +101,51 @@ def test_registry_docling_formats() -> None:
     assert get_converter("pdf").engine == "docling"
     assert get_converter("docx").engine == "docling"
     assert get_converter("pptx").engine == "docling"
+
+
+def test_docling_docx_fallback_exports_tables_and_images(monkeypatch) -> None:
+    from io import BytesIO
+
+    from docx import Document
+    from lxml import etree
+    from PIL import Image
+
+    class FailingDoclingConverter:
+        def convert(self, path: str) -> None:
+            raise RuntimeError("docling failed")
+
+    monkeypatch.setattr(
+        DoclingConverter,
+        "_create_converter",
+        lambda self: FailingDoclingConverter(),
+    )
+
+    base_dir = work_dir("docx")
+    source = base_dir / "demo.docx"
+    document = Document()
+    document.element.body.insert(0, etree.Comment("comment before body content"))
+    document.add_heading("Docx Title", level=1)
+    table = document.add_table(rows=2, cols=2)
+    table.rows[0].cells[0].text = "name"
+    table.rows[0].cells[1].text = "age"
+    table.rows[1].cells[0].text = "Alice"
+    table.rows[1].cells[1].text = "18"
+    image = BytesIO()
+    Image.new("RGB", (16, 16), color="red").save(image, format="PNG")
+    image.seek(0)
+    document.add_picture(image)
+    document.save(source)
+
+    result = get_converter("docx").convert(source, base_dir / "out" / "demo-file-id")
+
+    assert "# Docx Title" in result.markdown
+    assert "| name | age |" in result.markdown
+    assert "Alice" in result.markdown
+    assert "![image-001.png](/api/documents/demo-file-id/assets/image-001.png)" in result.markdown
+    assert result.assets[0].name == "image-001.png"
+    assert result.assets[0].path.exists()
+    assert result.metadata["fallback_engine"] == "python-docx"
+    assert result.warnings == ["docling failed for docx; used python-docx fallback"]
 
 
 def test_docling_dependency_available() -> None:

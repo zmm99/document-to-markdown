@@ -6,10 +6,13 @@ __pycache__/
 .venv/
 venv/
 data/
+models/
 *.egg-info/
 build/
 dist/
+release/
 tmp/
+.tmp/
 .pytest_tmp*/
 pytest-cache-files-*/
 tests/_tmp/

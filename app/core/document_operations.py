@@ -1,0 +1,270 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+import json
+from pathlib import Path
+from typing import Any
+
+from app.config import settings
+from app.converters.base import ConversionError, write_convert_result
+from app.converters.registry import get_converter
+from app.core.conversion_runner import run_converter_with_timeout
+from app.core.storage import StoredUpload, storage_manager
+from app.db.database import get_connection
+from app.db.repository import (
+    get_document,
+    get_success_parse_by_md5_and_format,
+    insert_parse_record,
+    list_document_assets,
+    replace_document_assets,
+)
+
+
+@dataclass(frozen=True)
+class DocumentConversionResult:
+    document_id: str
+    file_format: str
+    parse_record: dict[str, Any]
+    assets: list[dict[str, Any]]
+    cached: bool
+
+
+def document_url(document_id: str, suffix: str) -> str:
+    return f"{settings.api_prefix}/documents/{document_id}/{suffix}"
+
+
+def safe_resolve_data_path(relative_path: str | None) -> Path | None:
+    if not relative_path:
+        return None
+    try:
+        return storage_manager.resolve_data_path(relative_path)
+    except (TypeError, ValueError):
+        return None
+
+
+def read_metadata(metadata_path: str | None) -> tuple[dict[str, Any], list[str]]:
+    path = safe_resolve_data_path(metadata_path)
+    if path is None or not path.exists() or not path.is_file():
+        return {}, ["metadata is unavailable"]
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return {}, ["metadata is unavailable"]
+
+    warnings = data.pop("warnings", [])
+    data.pop("assets", None)
+    return data, warnings
+
+
+def is_parse_cache_usable(
+    parse_record: dict[str, Any],
+    assets: list[dict[str, Any]],
+) -> bool:
+    markdown_path = safe_resolve_data_path(parse_record.get("markdown_path"))
+    if markdown_path is None or not markdown_path.exists() or not markdown_path.is_file():
+        return False
+
+    metadata_path = safe_resolve_data_path(parse_record.get("metadata_path"))
+    if metadata_path is None or not metadata_path.exists() or not metadata_path.is_file():
+        return False
+    try:
+        json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        return False
+
+    for asset in assets:
+        asset_path = safe_resolve_data_path(asset.get("asset_path"))
+        if asset_path is None or not asset_path.exists() or not asset_path.is_file():
+            return False
+
+    return True
+
+
+def asset_response(document_id: str, asset: dict[str, Any]) -> dict[str, str | None]:
+    asset_name = asset["asset_name"]
+    return {
+        "name": asset_name,
+        "content_type": asset.get("content_type"),
+        "url": document_url(document_id, f"assets/{asset_name}"),
+    }
+
+
+def success_response(
+    document_id: str,
+    file_format: str,
+    parse_record: dict[str, Any],
+    assets: list[dict[str, Any]],
+    cached: bool | None = None,
+) -> dict[str, Any]:
+    metadata, warnings = read_metadata(parse_record.get("metadata_path"))
+    response: dict[str, Any] = {
+        "file_id": document_id,
+        "status": "success",
+        "file_format": file_format,
+        "markdown_url": document_url(document_id, "markdown"),
+        "download_url": document_url(document_id, "download"),
+        "assets": [asset_response(document_id, asset) for asset in assets],
+        "metadata": metadata,
+        "warnings": warnings,
+    }
+    if cached is not None:
+        response["cached"] = cached
+    return response
+
+
+def record_failed_parse(
+    document_id: str,
+    file_format: str,
+    engine: str,
+    output_dir: Path,
+    error_code: str,
+    message: str,
+) -> None:
+    with get_connection() as conn:
+        insert_parse_record(
+            conn,
+            {
+                "document_id": document_id,
+                "file_format": file_format,
+                "engine": engine,
+                "status": "failed",
+                "output_dir": storage_manager.relative_to_data_dir(output_dir),
+                "error_code": error_code,
+                "error_message": message,
+            },
+        )
+        conn.commit()
+
+
+def resolve_convert_asset_path(asset_path: Path, output_dir: Path) -> Path:
+    if asset_path.is_absolute():
+        return asset_path
+    if asset_path.exists():
+        return asset_path.resolve()
+    return (output_dir / asset_path).resolve()
+
+
+def get_usable_cached_conversion(
+    md5_value: str,
+    file_format: str,
+) -> DocumentConversionResult | None:
+    with get_connection() as conn:
+        cached_parse = get_success_parse_by_md5_and_format(conn, md5_value, file_format)
+        if cached_parse is None:
+            return None
+
+        document_id = cached_parse["id"]
+        assets = list_document_assets(conn, document_id)
+        if not is_parse_cache_usable(cached_parse, assets):
+            return None
+
+        return DocumentConversionResult(
+            document_id=document_id,
+            file_format=cached_parse["file_format"],
+            parse_record=cached_parse,
+            assets=assets,
+            cached=True,
+        )
+
+
+async def convert_stored_document(stored: StoredUpload) -> DocumentConversionResult:
+    converter = None
+    try:
+        converter = get_converter(stored.file_format)
+        result = await run_converter_with_timeout(
+            stored.file_format,
+            stored.upload_path,
+            stored.output_dir,
+        )
+        markdown_path, metadata_path = write_convert_result(result, stored.output_dir)
+        asset_records = [
+            {
+                "asset_name": asset.name,
+                "content_type": asset.content_type,
+                "asset_path": storage_manager.relative_to_data_dir(
+                    resolve_convert_asset_path(asset.path, stored.output_dir)
+                ),
+            }
+            for asset in result.assets
+        ]
+    except ConversionError as exc:
+        engine = converter.engine if converter is not None else "unknown"
+        record_failed_parse(
+            stored.file_id,
+            stored.file_format,
+            engine,
+            stored.output_dir,
+            exc.error_code,
+            exc.message,
+        )
+        raise
+    except Exception as exc:
+        engine = converter.engine if converter is not None else "unknown"
+        record_failed_parse(
+            stored.file_id,
+            stored.file_format,
+            engine,
+            stored.output_dir,
+            "convert_failed",
+            "document conversion failed",
+        )
+        raise ConversionError("convert_failed", "document conversion failed") from exc
+
+    with get_connection() as conn:
+        parse_record_id = insert_parse_record(
+            conn,
+            {
+                "document_id": stored.file_id,
+                "file_format": stored.file_format,
+                "engine": converter.engine,
+                "status": "success",
+                "output_dir": storage_manager.relative_to_data_dir(stored.output_dir),
+                "markdown_path": storage_manager.relative_to_data_dir(markdown_path),
+                "metadata_path": storage_manager.relative_to_data_dir(metadata_path),
+            },
+        )
+        replace_document_assets(conn, stored.file_id, asset_records)
+        conn.commit()
+
+    parse_record = {
+        "id": parse_record_id,
+        "document_id": stored.file_id,
+        "file_format": stored.file_format,
+        "status": "success",
+        "markdown_path": storage_manager.relative_to_data_dir(markdown_path),
+        "metadata_path": storage_manager.relative_to_data_dir(metadata_path),
+    }
+    return DocumentConversionResult(
+        document_id=stored.file_id,
+        file_format=stored.file_format,
+        parse_record=parse_record,
+        assets=asset_records,
+        cached=False,
+    )
+
+
+def stored_upload_from_document(document_id: str) -> StoredUpload | None:
+    with get_connection() as conn:
+        document = get_document(conn, document_id)
+
+    if document is None:
+        return None
+
+    upload_path = safe_resolve_data_path(document.get("upload_path"))
+    if upload_path is None:
+        return None
+
+    extension = Path(document["upload_path"]).suffix
+    output_dir = storage_manager.outputs_dir / document["storage_date"] / document["id"]
+    return StoredUpload(
+        file_id=document["id"],
+        md5=document["md5"],
+        original_filename=document["original_filename"],
+        extension=extension,
+        file_format=document["file_format"],
+        file_size=int(document["file_size"]),
+        storage_date=document["storage_date"],
+        upload_path=upload_path,
+        output_dir=output_dir,
+    )

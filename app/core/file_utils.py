@@ -18,6 +18,7 @@ SUPPORTED_FILE_FORMATS: dict[str, str] = {
 }
 
 MD5_PATTERN = re.compile(r"^[a-f0-9]{32}$")
+SNOWFLAKE_FILE_ID_PATTERN = re.compile(r"^[1-9][0-9]{9,19}$")
 
 
 class FileValidationError(ValueError):
@@ -97,8 +98,15 @@ def compute_md5_from_stream(stream: BinaryIO) -> str:
 
 def validate_file_id(file_id: str) -> str:
     normalized = file_id.replace("-", "").lower()
-    if not MD5_PATTERN.fullmatch(normalized):
-        raise FileValidationError("invalid_file_id", "file_id must be a md5 value")
+    if not MD5_PATTERN.fullmatch(normalized) and not SNOWFLAKE_FILE_ID_PATTERN.fullmatch(normalized):
+        raise FileValidationError("invalid_file_id", "file_id is invalid")
+    return normalized
+
+
+def validate_task_id(task_id: str) -> str:
+    normalized = task_id.replace("-", "").lower()
+    if not SNOWFLAKE_FILE_ID_PATTERN.fullmatch(normalized):
+        raise FileValidationError("invalid_task_id", "task_id is invalid")
     return normalized
 
 

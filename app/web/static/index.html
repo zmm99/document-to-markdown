@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DocumentToMarkdown 管理台</title>
+    <link rel="stylesheet" href="/web/static/style.css">
+    <script defer src="/web/static/app.js"></script>
+  </head>
+  <body>
+    <main>
+      <section id="loginView" class="login-shell" hidden>
+        <form id="loginForm" class="login-panel">
+          <h1>DocumentToMarkdown</h1>
+          <label>
+            <span>账号</span>
+            <input id="usernameInput" name="username" autocomplete="username" required>
+          </label>
+          <label>
+            <span>密码</span>
+            <input id="passwordInput" name="password" type="password" autocomplete="current-password" required>
+          </label>
+          <button type="submit">登录</button>
+          <p id="loginMessage" class="message"></p>
+        </form>
+      </section>
+
+      <section id="appView" class="app-shell" hidden>
+        <header class="topbar">
+          <div>
+            <h1>DocumentToMarkdown</h1>
+            <p id="sessionText">管理台</p>
+          </div>
+          <div class="topbar-actions">
+            <button id="refreshButton" type="button">刷新</button>
+            <button id="logoutButton" type="button">退出</button>
+          </div>
+        </header>
+
+        <section class="upload-band">
+          <form id="uploadForm">
+            <input id="fileInput" type="file" name="file" required>
+            <button type="submit">上传解析</button>
+          </form>
+          <p id="uploadMessage" class="message"></p>
+        </section>
+
+        <section class="workspace">
+          <section class="panel tasks-panel">
+            <div class="panel-header">
+              <div>
+                <h2>任务</h2>
+                <p id="taskCount">0 条</p>
+              </div>
+              <div class="filters">
+                <select id="taskStatusFilter" aria-label="任务状态">
+                  <option value="">全部</option>
+                  <option value="queued">排队中</option>
+                  <option value="running">转换中</option>
+                  <option value="success">成功</option>
+                  <option value="failed">失败</option>
+                  <option value="timeout">超时</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+                <div class="date-range" id="taskDateRange">
+                  <button id="taskDateRangeButton" class="range-trigger" type="button">日期范围</button>
+                  <div id="taskDateRangeMenu" class="range-menu" hidden>
+                    <label>
+                      <span>开始日期</span>
+                      <input id="taskStartDateInput" type="date" aria-label="任务开始日期">
+                    </label>
+                    <label>
+                      <span>结束日期</span>
+                      <input id="taskEndDateInput" type="date" aria-label="任务结束日期">
+                    </label>
+                    <div class="range-actions">
+                      <button id="taskDateRangeClear" type="button">清空</button>
+                      <button id="taskDateRangeApply" class="primary" type="button">应用</button>
+                    </div>
+                  </div>
+                </div>
+                <input id="taskSearchInput" placeholder="搜索任务">
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>文件</th>
+                    <th>状态</th>
+                    <th>进度</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="taskTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="panel files-panel">
+            <div class="panel-header">
+              <div>
+                <h2>文件</h2>
+                <p id="documentCount">0 条</p>
+              </div>
+              <div class="filters">
+                <select id="documentFormatFilter" aria-label="文件格式">
+                  <option value="">全部</option>
+                  <option value="pdf">pdf</option>
+                  <option value="docx">docx</option>
+                  <option value="pptx">pptx</option>
+                  <option value="xlsx">xlsx</option>
+                  <option value="csv">csv</option>
+                  <option value="html">html</option>
+                  <option value="txt">txt</option>
+                  <option value="markdown">markdown</option>
+                </select>
+                <div class="date-range" id="documentDateRange">
+                  <button id="documentDateRangeButton" class="range-trigger" type="button">日期范围</button>
+                  <div id="documentDateRangeMenu" class="range-menu" hidden>
+                    <label>
+                      <span>开始日期</span>
+                      <input id="documentStartDateInput" type="date" aria-label="文件开始日期">
+                    </label>
+                    <label>
+                      <span>结束日期</span>
+                      <input id="documentEndDateInput" type="date" aria-label="文件结束日期">
+                    </label>
+                    <div class="range-actions">
+                      <button id="documentDateRangeClear" type="button">清空</button>
+                      <button id="documentDateRangeApply" class="primary" type="button">应用</button>
+                    </div>
+                  </div>
+                </div>
+                <input id="documentSearchInput" placeholder="搜索文件">
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>文件</th>
+                    <th>格式</th>
+                    <th>大小</th>
+                    <th>附件</th>
+                    <th>时间</th>
+                    <th>下载</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="documentTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <div id="modalOverlay" class="modal-overlay" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header class="modal-header">
+          <h2 id="modalTitle"></h2>
+          <button id="modalCloseButton" type="button">关闭</button>
+        </header>
+        <div id="modalBody" class="modal-body"></div>
+      </section>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+  </body>
+</html>

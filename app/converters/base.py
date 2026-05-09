@@ -73,7 +73,7 @@ def write_convert_result(result: ConvertResult, output_dir: Path) -> tuple[Path,
     markdown_path = output_dir / "result.md"
     metadata_path = output_dir / "metadata.json"
 
-    markdown_path.write_text(result.markdown, encoding="utf-8")
+    markdown_path.write_text(result.markdown, encoding="utf-8", newline="")
     metadata_path.write_text(
         json.dumps(
             {
@@ -82,7 +82,6 @@ def write_convert_result(result: ConvertResult, output_dir: Path) -> tuple[Path,
                     {
                         "name": asset.name,
                         "content_type": asset.content_type,
-                        "path": asset.path.as_posix(),
                     }
                     for asset in result.assets
                 ],
@@ -92,6 +91,7 @@ def write_convert_result(result: ConvertResult, output_dir: Path) -> tuple[Path,
             indent=2,
         ),
         encoding="utf-8",
+        newline="",
     )
 
     return markdown_path, metadata_path
