@@ -95,6 +95,22 @@
                 <tbody id="taskTableBody"></tbody>
               </table>
             </div>
+            <div class="pagination">
+              <div class="page-size">
+                <span>每页</span>
+                <select id="taskPageSizeSelect" aria-label="任务每页数量">
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="page-actions">
+                <button id="taskPrevPageButton" type="button">上一页</button>
+                <span id="taskPageInfo">1 / 1</span>
+                <button id="taskNextPageButton" type="button">下一页</button>
+              </div>
+            </div>
           </section>
 
           <section class="panel files-panel">
@@ -150,6 +166,22 @@
                 </thead>
                 <tbody id="documentTableBody"></tbody>
               </table>
+            </div>
+            <div class="pagination">
+              <div class="page-size">
+                <span>每页</span>
+                <select id="documentPageSizeSelect" aria-label="文件每页数量">
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+              <div class="page-actions">
+                <button id="documentPrevPageButton" type="button">上一页</button>
+                <span id="documentPageInfo">1 / 1</span>
+                <button id="documentNextPageButton" type="button">下一页</button>
+              </div>
             </div>
           </section>
         </section>

@@ -529,7 +529,7 @@ def list_document_files(
     file_format: str | None = Query(default=None),
     start_date: str | None = Query(default=None),
     end_date: str | None = Query(default=None),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     _session: dict[str, Any] = Depends(require_admin_session),
 ) -> dict[str, Any]:

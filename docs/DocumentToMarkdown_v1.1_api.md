@@ -444,7 +444,7 @@ SESSION_EXPIRE_HOURS=8
 | `file_format` | string | 否 | 文件格式，例如 `pdf` |
 | `start_date` | string | 否 | 开始时间，支持 `yyyy-MM-dd` 或 `yyyy-MM-dd HH:mm:ss` |
 | `end_date` | string | 否 | 结束时间，支持 `yyyy-MM-dd` 或 `yyyy-MM-dd HH:mm:ss` |
-| `limit` | integer | 否 | 每页数量，默认 20，最大 100 |
+| `limit` | integer | 否 | 每页数量，默认 10，最大 100 |
 | `offset` | integer | 否 | 偏移量，默认 0 |
 
 响应示例：
@@ -543,7 +543,7 @@ SESSION_EXPIRE_HOURS=8
 | `q` | string | 否 | 文件名、文件 ID 或任务 ID 关键字 |
 | `start_date` | string | 否 | 开始时间，支持 `yyyy-MM-dd` 或 `yyyy-MM-dd HH:mm:ss` |
 | `end_date` | string | 否 | 结束时间，支持 `yyyy-MM-dd` 或 `yyyy-MM-dd HH:mm:ss` |
-| `limit` | integer | 否 | 每页数量，默认 20，最大 100 |
+| `limit` | integer | 否 | 每页数量，默认 10，最大 100 |
 | `offset` | integer | 否 | 偏移量，默认 0 |
 
 响应示例：
@@ -648,6 +648,7 @@ SESSION_EXPIRE_HOURS=8
 - 上传文件并创建解析任务。
 - 查看任务列表、任务状态和进度。
 - 查询文件列表，支持关键字、格式和日期范围筛选。
+- 任务列表和文件列表支持分页，默认每页 10 条，可选 10、20、50、100。
 - 预览 Markdown，查看文件详情。
 - 下载原始文件和 Markdown 压缩包。
 - 删除缓存、删除文件、取消任务、重试任务。

@@ -206,7 +206,7 @@ small {
   border-radius: 8px;
   background: var(--surface);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .files-panel {
@@ -280,6 +280,33 @@ small {
 .table-wrap {
   overflow: auto;
   min-height: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding: 10px 12px;
+}
+
+.page-size,
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.page-size select {
+  min-width: 72px;
+}
+
+.page-actions span {
+  min-width: 56px;
+  text-align: center;
+  color: var(--text);
 }
 
 table {

@@ -5,6 +5,16 @@ const state = {
   selectedTaskId: null,
   selectedFileId: null,
   pollTimer: null,
+  taskPagination: {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+  },
+  documentPagination: {
+    page: 1,
+    pageSize: 10,
+    total: 0,
+  },
 };
 
 const els = {
@@ -30,6 +40,10 @@ const els = {
   taskSearchInput: document.getElementById("taskSearchInput"),
   taskTableBody: document.getElementById("taskTableBody"),
   taskCount: document.getElementById("taskCount"),
+  taskPageSizeSelect: document.getElementById("taskPageSizeSelect"),
+  taskPrevPageButton: document.getElementById("taskPrevPageButton"),
+  taskNextPageButton: document.getElementById("taskNextPageButton"),
+  taskPageInfo: document.getElementById("taskPageInfo"),
   documentFormatFilter: document.getElementById("documentFormatFilter"),
   documentDateRangeButton: document.getElementById("documentDateRangeButton"),
   documentDateRangeMenu: document.getElementById("documentDateRangeMenu"),
@@ -40,6 +54,10 @@ const els = {
   documentSearchInput: document.getElementById("documentSearchInput"),
   documentTableBody: document.getElementById("documentTableBody"),
   documentCount: document.getElementById("documentCount"),
+  documentPageSizeSelect: document.getElementById("documentPageSizeSelect"),
+  documentPrevPageButton: document.getElementById("documentPrevPageButton"),
+  documentNextPageButton: document.getElementById("documentNextPageButton"),
+  documentPageInfo: document.getElementById("documentPageInfo"),
   modalOverlay: document.getElementById("modalOverlay"),
   modalTitle: document.getElementById("modalTitle"),
   modalBody: document.getElementById("modalBody"),
@@ -177,6 +195,54 @@ function buildQuery(params) {
   return text ? `?${text}` : "";
 }
 
+function paginationFor(kind) {
+  return kind === "task" ? state.taskPagination : state.documentPagination;
+}
+
+function totalPages(pagination) {
+  return Math.max(1, Math.ceil((Number(pagination.total) || 0) / pagination.pageSize));
+}
+
+function pageOffset(pagination) {
+  return (pagination.page - 1) * pagination.pageSize;
+}
+
+function updatePagination(kind) {
+  const prefix = kind === "task" ? "task" : "document";
+  const pagination = paginationFor(kind);
+  const pages = totalPages(pagination);
+  els[`${prefix}PageInfo`].textContent = `${pagination.page} / ${pages}`;
+  els[`${prefix}PrevPageButton`].disabled = pagination.page <= 1;
+  els[`${prefix}NextPageButton`].disabled = pagination.page >= pages;
+  els[`${prefix}PageSizeSelect`].value = String(pagination.pageSize);
+}
+
+async function changePage(kind, direction) {
+  const pagination = paginationFor(kind);
+  const nextPage = pagination.page + direction;
+  if (nextPage < 1 || nextPage > totalPages(pagination)) {
+    return;
+  }
+  pagination.page = nextPage;
+  if (kind === "task") {
+    await refreshTasks();
+  } else {
+    await refreshDocuments();
+  }
+}
+
+async function changePageSize(kind) {
+  const prefix = kind === "task" ? "task" : "document";
+  const pagination = paginationFor(kind);
+  pagination.pageSize = Number(els[`${prefix}PageSizeSelect`].value) || 10;
+  pagination.page = 1;
+  if (kind === "task") {
+    await refreshTasks();
+  } else {
+    await refreshDocuments();
+  }
+}
+
 function rangeLabel(start, end) {
   if (start && end) {
     return `${start} 至 ${end}`;
@@ -225,9 +291,9 @@ async function applyRange(kind) {
   updateRangeButton(kind);
   closeRangeMenus();
   if (kind === "task") {
-    await refreshTasks();
+    await refreshTasks({ resetPage: true });
   } else {
-    await refreshDocuments();
+    await refreshDocuments({ resetPage: true });
   }
 }
 
@@ -238,9 +304,9 @@ async function clearRange(kind) {
   updateRangeButton(kind);
   closeRangeMenus();
   if (kind === "task") {
-    await refreshTasks();
+    await refreshTasks({ resetPage: true });
   } else {
-    await refreshDocuments();
+    await refreshDocuments({ resetPage: true });
   }
 }
 
@@ -540,45 +606,69 @@ async function uploadFile(event) {
     els.uploadMessage.textContent = `任务已创建: ${task.task_id}`;
     state.selectedTaskId = task.task_id;
     els.fileInput.value = "";
-    await refreshTasks();
+    await refreshTasks({ resetPage: true });
     startPolling(task.task_id);
   } catch (error) {
     els.uploadMessage.textContent = error.message;
   }
 }
 
-async function refreshTasks() {
+async function refreshTasks(options = {}) {
+  if (options.resetPage) {
+    state.taskPagination.page = 1;
+  }
+  const pagination = state.taskPagination;
   const data = await apiFetch(
     `/api/tasks${buildQuery({
       status: els.taskStatusFilter.value,
       q: els.taskSearchInput.value.trim(),
       start_date: els.taskStartDateInput.value,
       end_date: els.taskEndDateInput.value,
-      limit: 50,
+      limit: pagination.pageSize,
+      offset: pageOffset(pagination),
     })}`
   );
+  pagination.total = Number(data.total) || 0;
+  const pages = totalPages(pagination);
+  if (pagination.page > pages) {
+    pagination.page = pages;
+    return refreshTasks();
+  }
   state.tasks = data.items;
-  els.taskCount.textContent = `${data.total} 条`;
+  els.taskCount.textContent = `共 ${pagination.total} 条`;
+  updatePagination("task");
   renderTasks();
 }
 
-async function refreshDocuments() {
+async function refreshDocuments(options = {}) {
+  if (options.resetPage) {
+    state.documentPagination.page = 1;
+  }
+  const pagination = state.documentPagination;
   const data = await apiFetch(
     `/api/documents${buildQuery({
       file_format: els.documentFormatFilter.value,
       q: els.documentSearchInput.value.trim(),
       start_date: els.documentStartDateInput.value,
       end_date: els.documentEndDateInput.value,
-      limit: 50,
+      limit: pagination.pageSize,
+      offset: pageOffset(pagination),
     })}`
   );
+  pagination.total = Number(data.total) || 0;
+  const pages = totalPages(pagination);
+  if (pagination.page > pages) {
+    pagination.page = pages;
+    return refreshDocuments();
+  }
   state.documents = data.items;
-  els.documentCount.textContent = `${data.total} 条`;
+  els.documentCount.textContent = `共 ${pagination.total} 条`;
+  updatePagination("document");
   renderDocuments();
 }
 
-async function refreshAll() {
-  await Promise.all([refreshTasks(), refreshDocuments()]);
+async function refreshAll(options = {}) {
+  await Promise.all([refreshTasks(options), refreshDocuments(options)]);
 }
 
 function renderTasks() {
@@ -786,7 +876,7 @@ async function handleTaskAction(event) {
       showToast("重试任务已创建");
       state.selectedTaskId = task.task_id;
       startPolling(task.task_id);
-      await refreshTasks();
+      await refreshTasks({ resetPage: true });
     }
     if (action === "delete-task" && window.confirm("确认删除任务记录？")) {
       await apiFetch(`/api/tasks/${id}`, { method: "DELETE" });
@@ -818,7 +908,8 @@ async function handleDocumentAction(event) {
       showToast("重新转换任务已创建");
       state.selectedTaskId = task.task_id;
       startPolling(task.task_id);
-      await refreshAll();
+      await refreshTasks({ resetPage: true });
+      await refreshDocuments();
     }
     if (action === "delete-cache" && window.confirm("确认删除转换缓存？")) {
       await apiFetch(`/api/documents/${id}/cache`, { method: "DELETE" });
@@ -876,21 +967,45 @@ els.refreshButton.addEventListener("click", () => refreshAll().catch((error) => 
 els.uploadForm.addEventListener("submit", uploadFile);
 els.taskTableBody.addEventListener("click", handleTaskAction);
 els.documentTableBody.addEventListener("click", handleDocumentAction);
-els.taskStatusFilter.addEventListener("change", () => refreshTasks().catch((error) => showToast(error.message)));
+els.taskStatusFilter.addEventListener("change", () =>
+  refreshTasks({ resetPage: true }).catch((error) => showToast(error.message))
+);
 els.taskDateRangeButton.addEventListener("click", () => toggleRangeMenu("task"));
 els.taskDateRangeApply.addEventListener("click", () => applyRange("task").catch((error) => showToast(error.message)));
 els.taskDateRangeClear.addEventListener("click", () => clearRange("task").catch((error) => showToast(error.message)));
-els.documentFormatFilter.addEventListener("change", () => refreshDocuments().catch((error) => showToast(error.message)));
+els.taskPageSizeSelect.addEventListener("change", () =>
+  changePageSize("task").catch((error) => showToast(error.message))
+);
+els.taskPrevPageButton.addEventListener("click", () => changePage("task", -1).catch((error) => showToast(error.message)));
+els.taskNextPageButton.addEventListener("click", () => changePage("task", 1).catch((error) => showToast(error.message)));
+els.documentFormatFilter.addEventListener("change", () =>
+  refreshDocuments({ resetPage: true }).catch((error) => showToast(error.message))
+);
 els.documentDateRangeButton.addEventListener("click", () => toggleRangeMenu("document"));
 els.documentDateRangeApply.addEventListener("click", () => applyRange("document").catch((error) => showToast(error.message)));
 els.documentDateRangeClear.addEventListener("click", () => clearRange("document").catch((error) => showToast(error.message)));
+els.documentPageSizeSelect.addEventListener("change", () =>
+  changePageSize("document").catch((error) => showToast(error.message))
+);
+els.documentPrevPageButton.addEventListener("click", () =>
+  changePage("document", -1).catch((error) => showToast(error.message))
+);
+els.documentNextPageButton.addEventListener("click", () =>
+  changePage("document", 1).catch((error) => showToast(error.message))
+);
 els.taskSearchInput.addEventListener("input", () => {
   window.clearTimeout(taskSearchTimer);
-  taskSearchTimer = window.setTimeout(() => refreshTasks().catch((error) => showToast(error.message)), 300);
+  taskSearchTimer = window.setTimeout(
+    () => refreshTasks({ resetPage: true }).catch((error) => showToast(error.message)),
+    300
+  );
 });
 els.documentSearchInput.addEventListener("input", () => {
   window.clearTimeout(documentSearchTimer);
-  documentSearchTimer = window.setTimeout(() => refreshDocuments().catch((error) => showToast(error.message)), 300);
+  documentSearchTimer = window.setTimeout(
+    () => refreshDocuments({ resetPage: true }).catch((error) => showToast(error.message)),
+    300
+  );
 });
 els.modalCloseButton.addEventListener("click", closeModal);
 els.modalOverlay.addEventListener("click", (event) => {
@@ -914,4 +1029,6 @@ document.addEventListener("keydown", (event) => {
 
 updateRangeButton("task");
 updateRangeButton("document");
+updatePagination("task");
+updatePagination("document");
 checkSession();
