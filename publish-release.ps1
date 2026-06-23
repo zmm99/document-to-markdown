@@ -105,7 +105,11 @@ New-Item -ItemType Directory -Path $packageDir -Force | Out-Null
 $rootFiles = @(
     "README.md",
     "pyproject.toml",
-    ".env.example"
+    ".env.example",
+    ".dockerignore",
+    "Dockerfile",
+    "Dockerfile.local-models",
+    "docker-compose.yml"
 )
 
 foreach ($file in $rootFiles) {
@@ -154,7 +158,11 @@ $manifest = [ordered]@{
         "tests/",
         "README.md",
         "pyproject.toml",
-        ".env.example"
+        ".env.example",
+        ".dockerignore",
+        "Dockerfile",
+        "Dockerfile.local-models",
+        "docker-compose.yml"
     )
     excluded = @(
         ".venv/",

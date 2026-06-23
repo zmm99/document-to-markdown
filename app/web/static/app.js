@@ -29,6 +29,8 @@ const els = {
   sessionText: document.getElementById("sessionText"),
   uploadForm: document.getElementById("uploadForm"),
   fileInput: document.getElementById("fileInput"),
+  ocrModeSelect: document.getElementById("ocrModeSelect"),
+  layoutEngineSelect: document.getElementById("layoutEngineSelect"),
   uploadMessage: document.getElementById("uploadMessage"),
   taskStatusFilter: document.getElementById("taskStatusFilter"),
   taskDateRangeButton: document.getElementById("taskDateRangeButton"),
@@ -116,6 +118,66 @@ function translateStage(value) {
 
 function translateMessage(value) {
   return messageLabels[value] || value || "";
+}
+
+function formatOcrMode(value) {
+  const labels = {
+    off: "关闭",
+    auto: "自动",
+    full: "强制",
+  };
+  return labels[value] || value || "";
+}
+
+function formatLayoutEngine(value) {
+  const labels = {
+    auto: "自动",
+    docling: "Docling",
+    ppstructure: "PP-StructureV3",
+  };
+  return labels[value] || value || "";
+}
+
+function formatBoolean(value) {
+  if (value === true) {
+    return "是";
+  }
+  if (value === false) {
+    return "否";
+  }
+  return "";
+}
+
+function formatFallbackMode(value) {
+  const labels = {
+    paged_retry: "按页解析",
+  };
+  return labels[value] || value || "";
+}
+
+function formatFallbackReason(value) {
+  const labels = {
+    large_pdf: "大页数 PDF",
+    full_parse_timeout: "整份解析超时",
+  };
+  return labels[value] || value || "";
+}
+
+function formatSeconds(value) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? `${seconds} 秒` : "";
+}
+
+function formatPageList(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return "";
+  }
+  return values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value > 0)
+    .sort((left, right) => left - right)
+    .map((value) => `第 ${value} 页`)
+    .join("、");
 }
 
 function escapeHtml(value) {
@@ -596,6 +658,8 @@ async function uploadFile(event) {
 
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("ocr_mode", els.ocrModeSelect.value);
+  formData.append("layout_engine", els.layoutEngineSelect.value);
   els.uploadMessage.textContent = "上传中";
 
   try {
@@ -742,6 +806,52 @@ function detailRow(label, value) {
   return `<dt>${escapeHtml(label)}</dt><dd>${value || ""}</dd>`;
 }
 
+function ppstructureFallbackDetailRows(metadata = null) {
+  const fallback = metadata?.ppstructure?.fallback;
+  if (!fallback) {
+    return "";
+  }
+
+  const rows = [];
+  rows.push(detailRow("PP 兜底策略", escapeHtml(formatFallbackMode(fallback.mode))));
+  rows.push(detailRow("兜底原因", escapeHtml(formatFallbackReason(fallback.reason))));
+  rows.push(detailRow("PP 页数", escapeHtml(fallback.page_count || "")));
+  rows.push(detailRow("单页超时", escapeHtml(formatSeconds(fallback.page_timeout_seconds))));
+
+  const preprocessedPages = formatPageList(fallback.preprocessed_pages);
+  if (preprocessedPages) {
+    rows.push(detailRow("预处理页", escapeHtml(preprocessedPages)));
+  }
+
+  const imageFallbackPages = formatPageList(fallback.image_fallback_pages);
+  if (imageFallbackPages) {
+    rows.push(detailRow("图片保留页", escapeHtml(imageFallbackPages)));
+  }
+
+  return rows.join("");
+}
+
+function optionDetailRows(options, metadata = null) {
+  const requested = options?.requested || metadata?.requested;
+  const actual = metadata?.actual;
+  const optionHash = options?.option_hash || metadata?.option_hash;
+  const rows = [];
+  if (requested) {
+    rows.push(detailRow("OCR 模式", escapeHtml(formatOcrMode(requested.ocr_mode))));
+    rows.push(detailRow("版面策略", escapeHtml(formatLayoutEngine(requested.layout_engine))));
+  }
+  if (actual) {
+    rows.push(detailRow("实际引擎", escapeHtml(formatLayoutEngine(actual.layout_engine))));
+    rows.push(detailRow("实际 OCR", escapeHtml(formatBoolean(actual.ocr_applied))));
+    rows.push(detailRow("执行原因", escapeHtml(actual.reason || "")));
+  }
+  if (optionHash) {
+    rows.push(detailRow("参数哈希", escapeHtml(optionHash)));
+  }
+  rows.push(ppstructureFallbackDetailRows(metadata));
+  return rows.join("");
+}
+
 function taskDetailHtml(task) {
   const actions = task.file_id
     ? `<div class="modal-actions">
@@ -763,6 +873,7 @@ function taskDetailHtml(task) {
       ${detailRow("信息", escapeHtml(translateMessage(task.message)))}
       ${detailRow("错误码", escapeHtml(task.error_code || ""))}
       ${detailRow("错误信息", escapeHtml(translateMessage(task.error_message)))}
+      ${optionDetailRows(task.options, task.result?.metadata)}
       ${detailRow("缓存命中", task.cached ? "是" : "否")}
       ${detailRow("创建时间", escapeHtml(task.created_at || ""))}
       ${detailRow("开始时间", escapeHtml(task.started_at || ""))}
@@ -797,6 +908,7 @@ function documentDetailHtml(info) {
       ${detailRow("更新时间", escapeHtml(info.updated_at || ""))}
       ${detailRow("解析引擎", escapeHtml(info.parse_record?.engine || ""))}
       ${detailRow("解析时间", escapeHtml(info.parse_record?.created_at || ""))}
+      ${optionDetailRows(null, info.metadata)}
       ${detailRow("错误码", escapeHtml(info.error_code || info.parse_record?.error_code || ""))}
       ${detailRow("错误信息", escapeHtml(translateMessage(info.message || info.parse_record?.error_message)))}
       ${detailRow("警告", escapeHtml((info.warnings || []).join("; ")))}
@@ -958,6 +1070,19 @@ function stopPolling() {
   }
 }
 
+function syncOcrLayoutControls() {
+  const ppstructureOption = Array.from(els.layoutEngineSelect.options).find(
+    (option) => option.value === "ppstructure"
+  );
+  const ocrDisabled = els.ocrModeSelect.value === "off";
+  if (ppstructureOption) {
+    ppstructureOption.disabled = ocrDisabled;
+  }
+  if (ocrDisabled && els.layoutEngineSelect.value === "ppstructure") {
+    els.layoutEngineSelect.value = "docling";
+  }
+}
+
 let taskSearchTimer = null;
 let documentSearchTimer = null;
 
@@ -965,6 +1090,7 @@ els.loginForm.addEventListener("submit", login);
 els.logoutButton.addEventListener("click", logout);
 els.refreshButton.addEventListener("click", () => refreshAll().catch((error) => showToast(error.message)));
 els.uploadForm.addEventListener("submit", uploadFile);
+els.ocrModeSelect.addEventListener("change", syncOcrLayoutControls);
 els.taskTableBody.addEventListener("click", handleTaskAction);
 els.documentTableBody.addEventListener("click", handleDocumentAction);
 els.taskStatusFilter.addEventListener("change", () =>
@@ -1029,6 +1155,7 @@ document.addEventListener("keydown", (event) => {
 
 updateRangeButton("task");
 updateRangeButton("document");
+syncOcrLayoutControls();
 updatePagination("task");
 updatePagination("document");
 checkSession();

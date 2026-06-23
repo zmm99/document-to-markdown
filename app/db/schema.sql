@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS parse_records (
     output_dir TEXT,
     markdown_path TEXT,
     metadata_path TEXT,
+    option_hash TEXT,
+    options_json TEXT,
     error_code TEXT,
     error_message TEXT,
     created_at TEXT NOT NULL,
@@ -34,12 +36,13 @@ CREATE TABLE IF NOT EXISTS parse_records (
 CREATE TABLE IF NOT EXISTS document_assets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     document_id TEXT NOT NULL,
+    parse_record_id INTEGER,
     asset_name TEXT NOT NULL,
     content_type TEXT,
     asset_path TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    UNIQUE(document_id, asset_name),
-    FOREIGN KEY(document_id) REFERENCES documents(id)
+    FOREIGN KEY(document_id) REFERENCES documents(id),
+    FOREIGN KEY(parse_record_id) REFERENCES parse_records(id)
 );
 
 CREATE TABLE IF NOT EXISTS conversion_tasks (
@@ -54,6 +57,8 @@ CREATE TABLE IF NOT EXISTS conversion_tasks (
     error_code TEXT,
     error_message TEXT,
     cached INTEGER NOT NULL DEFAULT 0,
+    option_hash TEXT,
+    options_json TEXT,
     created_at TEXT NOT NULL,
     started_at TEXT,
     finished_at TEXT,
@@ -69,3 +74,19 @@ ON conversion_tasks(file_id);
 
 CREATE INDEX IF NOT EXISTS idx_conversion_tasks_created_at
 ON conversion_tasks(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_parse_records_option_hash
+ON parse_records(option_hash);
+
+CREATE INDEX IF NOT EXISTS idx_conversion_tasks_option_hash
+ON conversion_tasks(option_hash);
+
+CREATE INDEX IF NOT EXISTS idx_document_assets_document_id
+ON document_assets(document_id);
+
+CREATE INDEX IF NOT EXISTS idx_document_assets_parse_record_id
+ON document_assets(parse_record_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_document_assets_parse_asset_name
+ON document_assets(parse_record_id, asset_name)
+WHERE parse_record_id IS NOT NULL;

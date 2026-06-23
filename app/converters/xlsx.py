@@ -6,7 +6,12 @@ from app.converters.base import ConvertResult, rows_to_markdown_table
 class XlsxConverter:
     engine = "openpyxl"
 
-    def convert(self, input_path: Path, output_dir: Path) -> ConvertResult:
+    def convert(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        options: object | None = None,
+    ) -> ConvertResult:
         from openpyxl import load_workbook
 
         workbook = load_workbook(input_path, data_only=True, read_only=True)

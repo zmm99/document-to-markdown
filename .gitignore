@@ -15,4 +15,4 @@ tmp/
 .tmp/
 .pytest_tmp*/
 pytest-cache-files-*/
-tests/_tmp/
+.tmp/tests/

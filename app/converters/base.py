@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class ConversionError(RuntimeError):
@@ -29,7 +29,12 @@ class ConvertResult:
 class Converter(Protocol):
     engine: str
 
-    def convert(self, input_path: Path, output_dir: Path) -> ConvertResult:
+    def convert(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        options: Any | None = None,
+    ) -> ConvertResult:
         ...
 
 

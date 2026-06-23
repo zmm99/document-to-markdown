@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from app.config import settings
 from app.converters.base import ConversionError, ConvertAsset, ConvertResult
+from app.core.conversion_options import ConversionOptions
 
 
 _conversion_semaphore: asyncio.Semaphore | None = None
@@ -36,6 +37,8 @@ def _run_converter_in_subprocess(
     file_format: str,
     input_path: Path,
     output_dir: Path,
+    options: ConversionOptions | None,
+    layout_engine: str | None,
     timeout_seconds: int,
 ) -> ConvertResult:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -49,6 +52,10 @@ def _run_converter_in_subprocess(
         str(output_dir),
         str(result_path),
     ]
+    if options is not None or layout_engine is not None:
+        command.append(options.to_json() if options is not None else "")
+    if layout_engine is not None:
+        command.append(layout_engine)
 
     try:
         subprocess.run(
@@ -92,6 +99,8 @@ async def run_converter_with_timeout(
     file_format: str,
     input_path: Path,
     output_dir: Path,
+    options: ConversionOptions | None = None,
+    layout_engine: str | None = None,
 ) -> ConvertResult:
     semaphore = _get_conversion_semaphore()
     async with semaphore:
@@ -100,5 +109,7 @@ async def run_converter_with_timeout(
             file_format,
             input_path,
             output_dir,
+            options,
+            layout_engine,
             settings.convert_timeout_seconds,
         )

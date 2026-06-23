@@ -8,7 +8,12 @@ from app.converters.base import ConvertResult, read_text_file, rows_to_markdown_
 class CsvConverter:
     engine = "csv"
 
-    def convert(self, input_path: Path, output_dir: Path) -> ConvertResult:
+    def convert(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        options: object | None = None,
+    ) -> ConvertResult:
         content = read_text_file(input_path)
         reader = csv.reader(StringIO(content))
         rows = [row for row in reader]

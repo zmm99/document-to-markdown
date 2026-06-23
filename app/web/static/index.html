@@ -40,6 +40,24 @@
         <section class="upload-band">
           <form id="uploadForm">
             <input id="fileInput" type="file" name="file" required>
+            <div class="upload-options">
+              <label>
+                <span>OCR</span>
+                <select id="ocrModeSelect" name="ocr_mode" aria-label="OCR 模式">
+                  <option value="auto" selected>自动</option>
+                  <option value="off">关闭</option>
+                  <option value="full">强制</option>
+                </select>
+              </label>
+              <label>
+                <span>版面</span>
+                <select id="layoutEngineSelect" name="layout_engine" aria-label="版面引擎">
+                  <option value="auto" selected>自动</option>
+                  <option value="docling">Docling</option>
+                  <option value="ppstructure">PP-StructureV3</option>
+                </select>
+              </label>
+            </div>
             <button type="submit">上传解析</button>
           </form>
           <p id="uploadMessage" class="message"></p>

@@ -5,6 +5,7 @@ from contextlib import suppress
 
 from app.config import settings
 from app.converters.base import ConversionError
+from app.core.conversion_options import conversion_options_from_json
 from app.core.document_operations import convert_stored_document, stored_upload_from_document
 from app.db.database import get_connection
 from app.db.repository import beijing_now
@@ -87,7 +88,8 @@ class ConversionTaskQueue:
             return
 
         try:
-            result = await convert_stored_document(stored)
+            options = conversion_options_from_json(task.get("options_json"))
+            result = await convert_stored_document(stored, options)
         except ConversionError as exc:
             if exc.error_code == "convert_timeout":
                 self._mark_timeout(task_id, exc.error_code, exc.message)

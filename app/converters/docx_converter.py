@@ -25,7 +25,12 @@ IMAGE_EXTENSIONS = {
 class DocxConverter:
     engine = "python-docx"
 
-    def convert(self, input_path: Path, output_dir: Path) -> ConvertResult:
+    def convert(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        options: object | None = None,
+    ) -> ConvertResult:
         document = Document(input_path)
         output_dir.mkdir(parents=True, exist_ok=True)
         assets_dir = output_dir / "assets"
@@ -88,7 +93,7 @@ class DocxConverter:
         if text:
             blocks.append(self._format_paragraph_text(paragraph, text))
 
-        document_id = output_dir.name
+        document_id = self._document_id_from_output_dir(output_dir)
         asset_url = f"{settings.api_prefix}/documents/{document_id}/assets/"
         for image_part in self._iter_paragraph_images(paragraph, document):
             extension = self._image_extension(image_part.content_type, image_part.partname.ext)
@@ -138,3 +143,8 @@ class DocxConverter:
             if re.fullmatch(r"\.[a-z0-9]{1,8}", extension):
                 return extension
         return ".bin"
+
+    def _document_id_from_output_dir(self, output_dir: Path) -> str:
+        if re.fullmatch(r"[a-f0-9]{64}", output_dir.name):
+            return output_dir.parent.name
+        return output_dir.name

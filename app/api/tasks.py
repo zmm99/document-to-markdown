@@ -1,11 +1,12 @@
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.core.auth import require_admin_session
+from app.core.conversion_options import conversion_options_from_json, parse_conversion_options
 from app.core.datetime_utils import normalize_date_range
 from app.core.document_operations import (
     get_usable_cached_conversion,
@@ -28,7 +29,7 @@ from app.db.repository import (
     beijing_now,
     get_document_by_md5_and_format,
     get_latest_success_parse,
-    list_document_assets,
+    list_assets_for_parse_record,
     upsert_document,
 )
 from app.db.task_repository import get_conversion_task, insert_conversion_task
@@ -67,7 +68,7 @@ def get_success_result(file_id: str | None, cached: bool | None = None) -> dict[
         parse_record = get_latest_success_parse(conn, file_id)
         if parse_record is None:
             return None
-        assets = list_document_assets(conn, file_id)
+        assets = list_assets_for_parse_record(conn, file_id, parse_record)
         if not is_parse_cache_usable(parse_record, assets):
             return None
         return success_response(
@@ -81,6 +82,13 @@ def get_success_result(file_id: str | None, cached: bool | None = None) -> dict[
 
 def task_response(task: dict[str, Any]) -> dict[str, Any]:
     file_id = task.get("file_id")
+    options_json = task.get("options_json")
+    options = None
+    if options_json:
+        try:
+            options = conversion_options_from_json(options_json).to_dict()
+        except FileValidationError:
+            options = None
     response: dict[str, Any] = {
         "task_id": task["task_id"],
         "status": task["status"],
@@ -93,6 +101,7 @@ def task_response(task: dict[str, Any]) -> dict[str, Any]:
         "original_filename": task["original_filename"],
         "file_format": task["file_format"],
         "cached": bool(task.get("cached")),
+        "options": options,
         "status_url": task_url(task["task_id"]),
         "document_url": f"{settings.api_prefix}/documents/{file_id}" if file_id else None,
         "markdown_url": f"{settings.api_prefix}/documents/{file_id}/markdown" if file_id else None,
@@ -117,6 +126,8 @@ def create_success_task(
     file_format: str,
     document_id: str,
     cached: bool,
+    options_json: str | None = None,
+    option_hash: str | None = None,
 ) -> dict[str, Any]:
     task_id = generate_file_id()
     now = beijing_now()
@@ -133,6 +144,8 @@ def create_success_task(
                 "stage": "completed",
                 "message": "命中缓存，转换完成",
                 "cached": cached,
+                "option_hash": option_hash,
+                "options_json": options_json,
                 "started_at": now,
                 "finished_at": now,
             },
@@ -147,6 +160,8 @@ def create_queued_task_for_document(
     original_filename: str,
     file_format: str,
     message: str = "任务等待转换",
+    options_json: str | None = None,
+    option_hash: str | None = None,
 ) -> dict[str, Any]:
     task_id = generate_file_id()
     with get_connection() as conn:
@@ -162,6 +177,8 @@ def create_queued_task_for_document(
                 "stage": "queued",
                 "message": message,
                 "cached": False,
+                "option_hash": option_hash,
+                "options_json": options_json,
             },
         )
         conn.commit()
@@ -170,18 +187,23 @@ def create_queued_task_for_document(
 
 
 @router.post("/convert")
-async def create_conversion_task(file: UploadFile | None = File(default=None)) -> JSONResponse:
+async def create_conversion_task(
+    file: UploadFile | None = File(default=None),
+    ocr_mode: str | None = Form(default=None),
+    layout_engine: str | None = Form(default=None),
+) -> JSONResponse:
     if file is None:
         raise_api_error(status.HTTP_400_BAD_REQUEST, "empty_file", "请上传文件")
 
     temp_path: Path | None = None
     try:
+        options = parse_conversion_options(ocr_mode, layout_engine)
         original_filename, _, file_format = validate_filename_and_format(file.filename)
         temp_path, md5_value, file_size = await save_upload_to_temp(file)
     except FileValidationError as exc:
         handle_validation_error(exc)
 
-    cached = get_usable_cached_conversion(md5_value, file_format)
+    cached = get_usable_cached_conversion(md5_value, file_format, options)
     if cached is not None:
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
@@ -190,6 +212,8 @@ async def create_conversion_task(file: UploadFile | None = File(default=None)) -
             cached.file_format,
             cached.document_id,
             cached=True,
+            options_json=options.to_json(),
+            option_hash=options.option_hash,
         )
         return JSONResponse(status_code=status.HTTP_200_OK, content=task_response(task))
 
@@ -242,6 +266,8 @@ async def create_conversion_task(file: UploadFile | None = File(default=None)) -
                 "stage": "queued",
                 "message": "任务等待转换",
                 "cached": False,
+                "option_hash": options.option_hash,
+                "options_json": options.to_json(),
             },
         )
         conn.commit()
@@ -375,6 +401,8 @@ async def retry_task(
         stored.original_filename,
         stored.file_format,
         message="重试任务等待转换",
+        options_json=task.get("options_json"),
+        option_hash=task.get("option_hash"),
     )
     await task_queue.enqueue(new_task["task_id"])
     return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=task_response(new_task))

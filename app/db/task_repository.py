@@ -31,12 +31,14 @@ def insert_conversion_task(conn: Connection, task: dict[str, Any]) -> None:
             error_code,
             error_message,
             cached,
+            option_hash,
+            options_json,
             created_at,
             started_at,
             finished_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             task["task_id"],
@@ -50,6 +52,8 @@ def insert_conversion_task(conn: Connection, task: dict[str, Any]) -> None:
             task.get("error_code"),
             task.get("error_message"),
             1 if task.get("cached") else 0,
+            task.get("option_hash"),
+            task.get("options_json"),
             task.get("created_at", now),
             task.get("started_at"),
             task.get("finished_at"),
@@ -80,6 +84,8 @@ def update_conversion_task(
         "error_code",
         "error_message",
         "cached",
+        "option_hash",
+        "options_json",
         "started_at",
         "finished_at",
     }

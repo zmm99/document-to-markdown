@@ -9,7 +9,12 @@ from app.converters.base import ConvertResult, read_text_file, rows_to_markdown_
 class HtmlConverter:
     engine = "beautifulsoup4"
 
-    def convert(self, input_path: Path, output_dir: Path) -> ConvertResult:
+    def convert(
+        self,
+        input_path: Path,
+        output_dir: Path,
+        options: object | None = None,
+    ) -> ConvertResult:
         soup = BeautifulSoup(read_text_file(input_path), "html.parser")
         for node in soup(["script", "style"]):
             node.decompose()

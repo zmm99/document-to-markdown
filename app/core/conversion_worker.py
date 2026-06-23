@@ -7,6 +7,7 @@ from typing import Any
 
 from app.converters.base import ConversionError, ConvertResult
 from app.converters.registry import get_converter
+from app.core.conversion_options import conversion_options_from_json
 
 
 def serialize_result(result: ConvertResult) -> dict[str, Any]:
@@ -30,10 +31,21 @@ def write_payload(result_path: Path, payload: dict[str, Any]) -> None:
     result_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
-def run(file_format: str, input_path: Path, output_dir: Path, result_path: Path) -> int:
+def run(
+    file_format: str,
+    input_path: Path,
+    output_dir: Path,
+    result_path: Path,
+    options_json: str | None = None,
+    layout_engine: str | None = None,
+) -> int:
     try:
-        converter = get_converter(file_format)
-        result = converter.convert(input_path, output_dir)
+        options = conversion_options_from_json(options_json)
+        target_layout_engine = layout_engine or (
+            "ppstructure" if options.layout_engine == "ppstructure" else None
+        )
+        converter = get_converter(file_format, target_layout_engine)
+        result = converter.convert(input_path, output_dir, options)
         write_payload(result_path, {"status": "success", "result": serialize_result(result)})
         return 0
     except ConversionError as exc:
@@ -59,10 +71,19 @@ def run(file_format: str, input_path: Path, output_dir: Path, result_path: Path)
 
 
 def main(argv: list[str]) -> int:
-    if len(argv) != 5:
+    if len(argv) not in {5, 6, 7}:
         return 2
-    _, file_format, input_path, output_dir, result_path = argv
-    return run(file_format, Path(input_path), Path(output_dir), Path(result_path))
+    _, file_format, input_path, output_dir, result_path, *rest = argv
+    options_json = rest[0] if rest else None
+    layout_engine = rest[1] if len(rest) > 1 else None
+    return run(
+        file_format,
+        Path(input_path),
+        Path(output_dir),
+        Path(result_path),
+        options_json or None,
+        layout_engine or None,
+    )
 
 
 if __name__ == "__main__":

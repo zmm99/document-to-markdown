@@ -85,7 +85,19 @@ def list_documents(
               ORDER BY id DESC
               LIMIT 1
           )
-        LEFT JOIN document_assets a ON a.document_id = d.id
+        LEFT JOIN document_assets a
+          ON a.document_id = d.id
+         AND (
+              a.parse_record_id = p.id
+              OR (
+                  a.parse_record_id IS NULL
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM document_assets pa
+                      WHERE pa.parse_record_id = p.id
+                  )
+              )
+         )
         {where}
         GROUP BY d.id
         ORDER BY d.created_at DESC, d.id DESC
@@ -178,7 +190,9 @@ def get_success_parse_by_md5_and_format(
             p.status,
             p.output_dir,
             p.markdown_path,
-            p.metadata_path
+            p.metadata_path,
+            p.option_hash,
+            p.options_json
         FROM documents d
         JOIN parse_records p ON p.document_id = d.id
         WHERE d.md5 = ?
@@ -188,6 +202,41 @@ def get_success_parse_by_md5_and_format(
         LIMIT 1
         """,
         (md5, file_format),
+    ).fetchone()
+    return row_to_dict(row)
+
+
+def get_success_parse_by_md5_format_and_option_hash(
+    conn: Connection,
+    md5: str,
+    file_format: str,
+    option_hash: str,
+    legacy_hash: str,
+) -> dict[str, Any] | None:
+    legacy_filter = "OR (p.option_hash IS NULL AND ? = ?)"
+    row = conn.execute(
+        f"""
+        SELECT
+            d.*,
+            p.id AS parse_record_id,
+            p.engine,
+            p.engine_version,
+            p.status,
+            p.output_dir,
+            p.markdown_path,
+            p.metadata_path,
+            p.option_hash,
+            p.options_json
+        FROM documents d
+        JOIN parse_records p ON p.document_id = d.id
+        WHERE d.md5 = ?
+          AND d.file_format = ?
+          AND p.status = 'success'
+          AND (p.option_hash = ? {legacy_filter})
+        ORDER BY p.id DESC
+        LIMIT 1
+        """,
+        (md5, file_format, option_hash, option_hash, legacy_hash),
     ).fetchone()
     return row_to_dict(row)
 
@@ -253,12 +302,14 @@ def insert_parse_record(conn: Connection, record: dict[str, Any]) -> int:
             output_dir,
             markdown_path,
             metadata_path,
+            option_hash,
+            options_json,
             error_code,
             error_message,
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             record["document_id"],
@@ -269,6 +320,8 @@ def insert_parse_record(conn: Connection, record: dict[str, Any]) -> int:
             record.get("output_dir"),
             record.get("markdown_path"),
             record.get("metadata_path"),
+            record.get("option_hash"),
+            record.get("options_json"),
             record.get("error_code"),
             record.get("error_message"),
             record.get("created_at", now),
@@ -283,22 +336,49 @@ def replace_document_assets(
     document_id: str,
     assets: list[dict[str, Any]],
 ) -> None:
-    conn.execute("DELETE FROM document_assets WHERE document_id = ?", (document_id,))
+    conn.execute(
+        "DELETE FROM document_assets WHERE document_id = ? AND parse_record_id IS NULL",
+        (document_id,),
+    )
+    _insert_assets(conn, document_id, None, assets)
+
+
+def replace_parse_assets(
+    conn: Connection,
+    document_id: str,
+    parse_record_id: int,
+    assets: list[dict[str, Any]],
+) -> None:
+    conn.execute(
+        "DELETE FROM document_assets WHERE parse_record_id = ?",
+        (parse_record_id,),
+    )
+    _insert_assets(conn, document_id, parse_record_id, assets)
+
+
+def _insert_assets(
+    conn: Connection,
+    document_id: str,
+    parse_record_id: int | None,
+    assets: list[dict[str, Any]],
+) -> None:
     now = beijing_now()
     conn.executemany(
         """
         INSERT INTO document_assets (
             document_id,
+            parse_record_id,
             asset_name,
             content_type,
             asset_path,
             created_at
         )
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """,
         [
             (
                 document_id,
+                parse_record_id,
                 asset["asset_name"],
                 asset.get("content_type"),
                 asset["asset_path"],
@@ -317,17 +397,98 @@ def list_document_assets(conn: Connection, document_id: str) -> list[dict[str, A
     return [dict(row) for row in rows]
 
 
+def _parse_record_id(parse_record: dict[str, Any] | None) -> int | None:
+    if not parse_record:
+        return None
+    value = parse_record.get("parse_record_id") or parse_record.get("id")
+    if value is None:
+        return None
+    return int(value)
+
+
+def list_assets_for_parse_record(
+    conn: Connection,
+    document_id: str,
+    parse_record: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    parse_record_id = _parse_record_id(parse_record)
+    if parse_record_id is not None:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM document_assets
+            WHERE document_id = ?
+              AND parse_record_id = ?
+            ORDER BY id
+            """,
+            (document_id, parse_record_id),
+        ).fetchall()
+        if rows:
+            return [dict(row) for row in rows]
+        if parse_record and parse_record.get("option_hash") is not None:
+            return []
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM document_assets
+        WHERE document_id = ?
+          AND parse_record_id IS NULL
+        ORDER BY id
+        """,
+        (document_id,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_document_asset(
     conn: Connection,
     document_id: str,
     asset_name: str,
+    option_hash: str | None = None,
 ) -> dict[str, Any] | None:
+    if option_hash:
+        row = conn.execute(
+            """
+            SELECT a.*
+            FROM document_assets a
+            JOIN parse_records p ON p.id = a.parse_record_id
+            WHERE a.document_id = ?
+              AND a.asset_name = ?
+              AND p.option_hash = ?
+              AND p.status = 'success'
+            ORDER BY p.id DESC, a.id DESC
+            LIMIT 1
+            """,
+            (document_id, asset_name, option_hash),
+        ).fetchone()
+        return row_to_dict(row)
+
+    row = conn.execute(
+        """
+        SELECT a.*
+        FROM document_assets a
+        JOIN parse_records p ON p.id = a.parse_record_id
+        WHERE a.document_id = ?
+          AND a.asset_name = ?
+          AND p.status = 'success'
+        ORDER BY p.id DESC, a.id DESC
+        LIMIT 1
+        """,
+        (document_id, asset_name),
+    ).fetchone()
+    if row is not None:
+        return row_to_dict(row)
+
     row = conn.execute(
         """
         SELECT *
         FROM document_assets
         WHERE document_id = ?
           AND asset_name = ?
+          AND parse_record_id IS NULL
+        ORDER BY id DESC
+        LIMIT 1
         """,
         (document_id, asset_name),
     ).fetchone()

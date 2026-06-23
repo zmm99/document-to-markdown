@@ -191,6 +191,24 @@ small {
   flex-wrap: wrap;
 }
 
+.upload-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.upload-options select {
+  min-width: 116px;
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(330px, 0.7fr) minmax(680px, 1.3fr);
@@ -638,14 +656,21 @@ tr.selected {
 
   .filters,
   .topbar-actions,
+  .upload-options,
   #uploadForm {
     justify-content: flex-start;
+  }
+
+  .upload-options,
+  .upload-options label {
+    width: 100%;
   }
 
   .filters input,
   .filters select,
   .range-trigger,
   #uploadForm input,
+  #uploadForm select,
   #uploadForm button {
     width: 100%;
   }
