@@ -17,6 +17,7 @@ from app.core.conversion_options import (
 )
 from app.core.conversion_runner import run_converter_with_timeout
 from app.core.layout_router import LayoutDecision, decide_layout
+from app.core.markdown_assets import asset_url, document_url
 from app.core.response_text import status_text, translate_warnings
 from app.core.storage import StoredUpload, storage_manager
 from app.db.database import get_connection
@@ -36,10 +37,6 @@ class DocumentConversionResult:
     parse_record: dict[str, Any]
     assets: list[dict[str, Any]]
     cached: bool
-
-
-def document_url(document_id: str, suffix: str) -> str:
-    return f"{settings.api_prefix}/documents/{document_id}/{suffix}"
 
 
 def safe_resolve_data_path(relative_path: str | None) -> Path | None:
@@ -94,13 +91,6 @@ def parse_record_option_hash(parse_record: dict[str, Any] | None) -> str | None:
     if not parse_record:
         return None
     return parse_record.get("option_hash")
-
-
-def asset_url(document_id: str, asset_name: str, option_hash: str | None = None) -> str:
-    url = document_url(document_id, f"assets/{asset_name}")
-    if option_hash:
-        return f"{url}?option_hash={option_hash}"
-    return url
 
 
 def asset_response(

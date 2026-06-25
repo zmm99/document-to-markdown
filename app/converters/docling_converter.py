@@ -48,7 +48,7 @@ class DoclingConverter:
 
         return ConvertResult(
             markdown=markdown,
-            metadata=self._metadata(resolved_options),
+            metadata=self._metadata(resolved_options, input_path),
             assets=assets,
         )
 
@@ -142,7 +142,7 @@ class DoclingConverter:
             return options
         return parse_conversion_options()
 
-    def _metadata(self, options: ConversionOptions) -> dict:
+    def _metadata(self, options: ConversionOptions, input_path: Path | None = None) -> dict:
         if self.source_format != "pdf":
             return {
                 "engine": self.engine,
@@ -155,6 +155,7 @@ class DoclingConverter:
 
         ocr_enabled = options.ocr_mode != "off"
         force_full_page = options.ocr_mode == "full"
+        page_count = self._pdf_page_count(input_path) if input_path is not None else None
         return {
             "engine": self.engine,
             "source_format": self.source_format,
@@ -169,7 +170,36 @@ class DoclingConverter:
                 "force_full_page_ocr": force_full_page,
                 "bitmap_area_threshold": RAPIDOCR_BITMAP_AREA_THRESHOLD if ocr_enabled else None,
             },
+            "pages": {
+                "page_count": page_count,
+                "source": "pdf_preflight",
+                "items": [
+                    {
+                        "page": page,
+                        "markdown_start_line": None,
+                        "markdown_end_line": None,
+                        "asset_names": [],
+                        "ocr_applied": ocr_enabled,
+                        "fallback": None,
+                    }
+                    for page in range(1, page_count + 1)
+                ]
+                if page_count is not None
+                else [],
+            },
         }
+
+    def _pdf_page_count(self, input_path: Path) -> int | None:
+        try:
+            import pypdfium2 as pdfium
+
+            document = pdfium.PdfDocument(str(input_path))
+            try:
+                return len(document)
+            finally:
+                document.close()
+        except Exception:
+            return None
 
     def _layout_reason(self, options: ConversionOptions) -> str:
         if self.source_format != "pdf":

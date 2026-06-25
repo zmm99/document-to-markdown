@@ -578,6 +578,14 @@ tr.selected {
   background: #fff;
 }
 
+.markdown-rendered .markdown-image-center {
+  text-align: center;
+}
+
+.markdown-rendered .markdown-image-center img {
+  display: inline-block;
+}
+
 .markdown-rendered a {
   color: var(--primary);
 }

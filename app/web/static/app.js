@@ -434,6 +434,25 @@ function resolveMarkdownUrl(value, fileId, image = false) {
   return "#";
 }
 
+function getHtmlAttribute(tag, name) {
+  const pattern = new RegExp(`${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, "i");
+  const match = String(tag || "").match(pattern);
+  return match ? match[2] || match[3] || match[4] || "" : "";
+}
+
+function renderHtmlImageTag(tag, fileId) {
+  const rawSrc = getHtmlAttribute(tag, "src");
+  const src = resolveMarkdownUrl(rawSrc, fileId, true);
+  const alt = getHtmlAttribute(tag, "alt");
+  const rawWidth = getHtmlAttribute(tag, "width");
+  const rawHeight = getHtmlAttribute(tag, "height");
+  const width = /^\d+%?$/.test(rawWidth) ? rawWidth : "";
+  const height = /^\d+$/.test(rawHeight) ? rawHeight : "";
+  return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" referrerpolicy="no-referrer"${
+    width ? ` width="${escapeHtml(width)}"` : ""
+  }${height ? ` height="${escapeHtml(height)}"` : ""}>`;
+}
+
 function renderInlineMarkdown(text, fileId) {
   const tokens = [];
   const stash = (html) => {
@@ -444,6 +463,11 @@ function renderInlineMarkdown(text, fileId) {
 
   let source = String(text || "");
   source = source.replace(/`([^`]+)`/g, (_match, code) => stash(`<code>${escapeHtml(code)}</code>`));
+  source = source.replace(
+    /<div\b[^>]*text-align\s*:\s*center[^>]*>\s*(<img\b[^>]*\/?>)\s*<\/div>/gi,
+    (_match, imgTag) => stash(`<div class="markdown-image-center">${renderHtmlImageTag(imgTag, fileId)}</div>`)
+  );
+  source = source.replace(/<img\b[^>]*\/?>/gi, (imgTag) => stash(renderHtmlImageTag(imgTag, fileId)));
   source = source.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_match, alt, url) => {
     const src = resolveMarkdownUrl(url, fileId, true);
     return stash(

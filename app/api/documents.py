@@ -37,6 +37,7 @@ from app.core.file_utils import (
 )
 from app.core.id_generator import generate_file_id
 from app.core.layout_router import decide_layout
+from app.core.markdown_assets import rewrite_asset_urls_to_relative
 from app.core.response_text import (
     api_error_detail,
     stage_text,
@@ -833,9 +834,17 @@ def download_document(file_id: str) -> Response:
 
     markdown_path = resolve_markdown_path(parse_record)
     metadata_path = safe_resolve_data_path(parse_record.get("metadata_path"))
+    option_hash = parse_record_option_hash(parse_record)
+    markdown = markdown_path.read_text(encoding="utf-8")
+    markdown = rewrite_asset_urls_to_relative(
+        markdown,
+        document_id,
+        [asset["asset_name"] for asset in assets],
+        option_hash,
+    )
     archive = BytesIO()
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        zip_file.write(markdown_path, "result.md")
+        zip_file.writestr("result.md", markdown)
         if metadata_path is not None and metadata_path.exists() and metadata_path.is_file():
             zip_file.write(metadata_path, "metadata.json")
         for asset in assets:

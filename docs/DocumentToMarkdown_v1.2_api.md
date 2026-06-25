@@ -214,6 +214,20 @@ curl "http://127.0.0.1:9527/api/tasks/327705216172429312"
         "ocr_applied": true,
         "reason": "scanned_pdf_image_only"
       },
+      "pages": {
+        "page_count": 66,
+        "source": "ppstructure",
+        "items": [
+          {
+            "page": 1,
+            "markdown_start_line": 1,
+            "markdown_end_line": 35,
+            "asset_names": ["image-001.png"],
+            "ocr_applied": true,
+            "fallback": null
+          }
+        ]
+      },
       "option_hash": "a366010d9d2846902aea377a5a94d2a7b665e635508d5d1474cfe8bc3e538c51"
     },
     "warnings": []
@@ -277,6 +291,20 @@ curl -X POST "http://127.0.0.1:9527/api/documents/convert" \
       "layout_engine": "ppstructure",
       "ocr_applied": true,
       "reason": "requested_ppstructure"
+    },
+    "pages": {
+      "page_count": 12,
+      "source": "ppstructure",
+      "items": [
+        {
+          "page": 1,
+          "markdown_start_line": 1,
+          "markdown_end_line": 35,
+          "asset_names": ["image-001.png"],
+          "ocr_applied": true,
+          "fallback": null
+        }
+      ]
     }
   },
   "warnings": []
@@ -360,6 +388,14 @@ metadata.json
 assets/
 ```
 
+zip 内 `result.md` 会把本服务附件地址改为本地相对路径，例如：
+
+```markdown
+![stamp](assets/image-001.png)
+```
+
+因此解压后在支持本地相对图片的 Markdown 查看器中打开 `result.md`，可以直接读取同级 `assets/` 目录下的图片。外部 URL 图片不会被改写。
+
 建议需要归档或跨系统传输时优先使用 zip 包，避免遗漏图片附件。
 
 ## 14. 下载原始文件
@@ -404,9 +440,46 @@ metadata 会记录请求参数、实际路线和选择原因：
       "image_fallback_pages": [27]
     }
   },
+  "pages": {
+    "page_count": 66,
+    "source": "ppstructure",
+    "items": [
+      {
+        "page": 1,
+        "markdown_start_line": 1,
+        "markdown_end_line": 35,
+        "asset_names": ["image-001.png"],
+        "ocr_applied": true,
+        "fallback": null
+      },
+      {
+        "page": 27,
+        "markdown_start_line": 860,
+        "markdown_end_line": 862,
+        "asset_names": ["image-018.jpg"],
+        "ocr_applied": true,
+        "fallback": "image_preserved_after_ocr_timeout"
+      }
+    ]
+  },
   "option_hash": "a366010d9d2846902aea377a5a94d2a7b665e635508d5d1474cfe8bc3e538c51"
 }
 ```
+
+`metadata.pages` 说明：
+
+| 字段 | 说明 |
+| --- | --- |
+| `pages.page_count` | 原始文档页数 |
+| `pages.source` | 页面信息来源，当前可能为 `ppstructure` 或 `pdf_preflight` |
+| `pages.items[].page` | 原始页码，从 1 开始 |
+| `pages.items[].markdown_start_line` | 该页内容在最终 Markdown 中的起始行；没有可靠映射时为 `null` |
+| `pages.items[].markdown_end_line` | 该页内容在最终 Markdown 中的结束行；没有可靠映射时为 `null` |
+| `pages.items[].asset_names` | 该页导出的本地附件文件名 |
+| `pages.items[].ocr_applied` | 该页是否经过 OCR/结构化解析 |
+| `pages.items[].fallback` | 页级兜底原因，例如 `image_preserved_after_ocr_timeout` |
+
+注意：Markdown 是连续文本格式，渲染后没有原生分页；原始页码定位应使用 `metadata.pages`。PP-StructureV3 路线可提供较完整的页级行号和附件映射；Docling PDF 路线当前先提供 `page_count`，逐页行号可能为 `null`。
 
 常见 `actual.reason`：
 

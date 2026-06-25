@@ -36,7 +36,9 @@ def adapt_ppstructure_response(
     assets: list[ConvertAsset] = []
     warnings: list[str] = []
     pruned_results: list[object] = []
+    page_items: list[dict[str, object]] = []
     markdown_image_count = 0
+    next_markdown_line = 1
 
     for page_index, page_result in enumerate(layout_results, start=1):
         if not isinstance(page_result, dict):
@@ -53,6 +55,7 @@ def adapt_ppstructure_response(
         if not isinstance(images, dict):
             raise ConversionError("ppstructure_invalid_response", "PP-StructureV3响应结构不合法")
 
+        page_asset_names: list[str] = []
         for original_name, encoded_image in images.items():
             if not isinstance(original_name, str) or not isinstance(encoded_image, str):
                 raise ConversionError("ppstructure_invalid_response", "PP-StructureV3响应结构不合法")
@@ -82,13 +85,34 @@ def adapt_ppstructure_response(
                     path=asset_path.resolve(),
                 )
             )
+            page_asset_names.append(asset_name)
 
         page_text = text.strip()
+        markdown_start_line: int | None = None
+        markdown_end_line: int | None = None
         if page_text:
+            markdown_start_line = next_markdown_line
+            markdown_end_line = markdown_start_line + page_text.count("\n")
+            next_markdown_line = markdown_end_line + 3
             markdown_parts.append(page_text)
 
+        page_fallback = None
         if "prunedResult" in page_result:
-            pruned_results.append(page_result["prunedResult"])
+            pruned_result = page_result["prunedResult"]
+            pruned_results.append(pruned_result)
+            if isinstance(pruned_result, dict):
+                page_fallback = pruned_result.get("fallback")
+
+        page_items.append(
+            {
+                "page": page_index,
+                "markdown_start_line": markdown_start_line,
+                "markdown_end_line": markdown_end_line,
+                "asset_names": page_asset_names,
+                "ocr_applied": True,
+                "fallback": page_fallback,
+            }
+        )
 
     metadata = {
         "engine": "ppstructure",
@@ -106,6 +130,11 @@ def adapt_ppstructure_response(
             "use_seal_recognition": settings.ppstructure_use_seal_recognition,
             "log_id": response.get("logId"),
             "data_info": result.get("dataInfo") or {},
+        },
+        "pages": {
+            "page_count": len(layout_results),
+            "source": "ppstructure",
+            "items": page_items,
         },
         "pruned_results": pruned_results,
     }

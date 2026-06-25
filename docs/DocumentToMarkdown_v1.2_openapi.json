@@ -134,6 +134,7 @@
           "documents"
         ],
         "summary": "Convert Document",
+        "description": "同步转换文档。成功响应中的 metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。PP-StructureV3 路线可返回页级行号和附件映射，Docling PDF 路线当前主要提供 page_count。",
         "operationId": "convert_document_api_documents_convert_post",
         "requestBody": {
           "content": {
@@ -561,6 +562,7 @@
           "documents"
         ],
         "summary": "Download Document",
+        "description": "下载 Markdown zip 包。zip 包包含 result.md、metadata.json 和 assets/；result.md 中本服务附件 URL 会改写为 assets/xxx 相对路径，外部 URL 保持原样。",
         "operationId": "download_document_api_documents__file_id__download_get",
         "parameters": [
           {
@@ -717,6 +719,7 @@
           "tasks"
         ],
         "summary": "Create Conversion Task",
+        "description": "创建异步转换任务。任务成功后的 result.metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。",
         "operationId": "create_conversion_task_api_tasks_convert_post",
         "requestBody": {
           "content": {
@@ -893,6 +896,7 @@
           "tasks"
         ],
         "summary": "Get Task",
+        "description": "查询任务状态。成功任务的 result.metadata.pages 提供原始页码、Markdown 行号范围、页级附件和兜底信息。",
         "operationId": "get_task_api_tasks__task_id__get",
         "parameters": [
           {
@@ -1240,6 +1244,104 @@
           "password"
         ],
         "title": "LoginRequest"
+      },
+      "PageMetadata": {
+        "properties": {
+          "page_count": {
+            "type": "integer",
+            "title": "Page Count",
+            "description": "原始文档页数。"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "页面信息来源，当前可能为 ppstructure 或 pdf_preflight。"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PageMetadataItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "页级信息列表，页码从 1 开始。"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page_count",
+          "source",
+          "items"
+        ],
+        "title": "PageMetadata",
+        "description": "转换结果 metadata.pages。Markdown 是连续文本格式，原始页码定位应以该字段为准。"
+      },
+      "PageMetadataItem": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "description": "原始页码，从 1 开始。"
+          },
+          "markdown_start_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markdown Start Line",
+            "description": "该页内容在最终 Markdown 中的起始行；没有可靠映射时为 null。"
+          },
+          "markdown_end_line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Markdown End Line",
+            "description": "该页内容在最终 Markdown 中的结束行；没有可靠映射时为 null。"
+          },
+          "asset_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Asset Names",
+            "description": "该页导出的本地附件文件名。"
+          },
+          "ocr_applied": {
+            "type": "boolean",
+            "title": "Ocr Applied",
+            "description": "该页是否经过 OCR/结构化解析。"
+          },
+          "fallback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback",
+            "description": "页级兜底原因，例如 image_preserved_after_ocr_timeout。"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "markdown_start_line",
+          "markdown_end_line",
+          "asset_names",
+          "ocr_applied",
+          "fallback"
+        ],
+        "title": "PageMetadataItem"
       },
       "ValidationError": {
         "properties": {

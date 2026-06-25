@@ -14,6 +14,7 @@ DocumentToMarkdown 是一个基于 FastAPI 的文档转 Markdown 服务，适合
 - PP-StructureV3 作为独立服务接入，适合扫描档案、表格、印章和复杂版式。
 - 图片附件统一保存到 `assets/`，Markdown 中引用本服务附件地址。
 - PP-StructureV3 返回的 base64/data URL/同源 URL 图片会本地化保存；其他来源 URL 图片保留原引用并记录 warning。
+- 转换 metadata 提供 `pages` 页面信息；Markdown 本身不保证分页，外部系统需要页码定位时应以 `metadata.pages` 为准。
 
 ## 快速启动
 
@@ -55,7 +56,7 @@ curl "http://127.0.0.1:9527/api/tasks/{task_id}"
 任务成功后使用返回的：
 
 - `result.markdown_url` 获取 Markdown。
-- `result.download_url` 下载包含 `result.md`、`metadata.json`、`assets/` 的 zip。
+- `result.download_url` 下载包含 `result.md`、`metadata.json`、`assets/` 的 zip；zip 内 `result.md` 的本服务图片引用会改为 `assets/xxx` 相对路径，便于离线打开。
 - `result.assets[].url` 获取图片等附件。
 
 同步接口也可用：
@@ -88,6 +89,40 @@ curl -X POST "http://127.0.0.1:9527/api/documents/convert" \
 - `layout_engine=ppstructure`：强制 PP-StructureV3 独立服务，仅支持 PDF。
 - `layout_engine=auto`：自动选择 Docling 或 PP-StructureV3。
 - `ocr_mode=off&layout_engine=ppstructure` 会返回 400 参数冲突。
+
+## 页面信息
+
+转换结果的 `metadata.pages` 用于描述原始文档页码和 Markdown/附件之间的关系。Markdown 是连续文本格式，渲染后的分页不会等同于原始 PDF 页码，因此页码定位应使用该字段。
+
+示例：
+
+```json
+{
+  "pages": {
+    "page_count": 12,
+    "source": "ppstructure",
+    "items": [
+      {
+        "page": 1,
+        "markdown_start_line": 1,
+        "markdown_end_line": 35,
+        "asset_names": ["image-001.png"],
+        "ocr_applied": true,
+        "fallback": null
+      }
+    ]
+  }
+}
+```
+
+字段说明：
+- `page_count`：原始文档页数。
+- `source`：页面信息来源，当前可能为 `ppstructure` 或 `pdf_preflight`。
+- `items[].page`：原始页码，从 1 开始。
+- `items[].markdown_start_line` / `markdown_end_line`：该页内容在最终 Markdown 中的行号范围；Docling 路线暂不保证逐页内容映射，可能为 `null`。
+- `items[].asset_names`：该页导出的本地附件文件名。
+- `items[].ocr_applied`：该页是否经过 OCR/结构化解析。
+- `items[].fallback`：页级兜底原因，例如 PP 单页 OCR 超时后保留整页图片。
 
 ## 模型和 PP-StructureV3
 
