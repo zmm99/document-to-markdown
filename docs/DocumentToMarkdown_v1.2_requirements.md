@@ -13,6 +13,7 @@ v1.2 在 v1.1 的同步转换、异步任务、文件管理、任务管理、`/w
 - PP-StructureV3 作为独立服务接入，同时承担版面解析和 OCR，不作为 Docling 的普通 OCR 引擎。
 - RapidOCR 作为 Docling 路线的内置默认 OCR 能力，CPU 版和 GPU 版都具备。
 - 所有解析结果统一输出为当前服务已有的 `result.md`、`metadata.json`、`assets/` 结构。
+- Image inputs `.png`, `.jpg`, `.jpeg` are supported as single-page documents; the original image must be preserved as an asset, and OCR is supplementary text extraction only.
 - 模型文件从镜像中剥离，运行时通过宿主机目录挂载。
 
 ## 2. 对外参数
@@ -27,6 +28,7 @@ v1.2 对外只暴露两个核心参数，避免调用方配置过多。
 不再对外暴露 `ocr_engine`。内部规则如下：
 
 - `layout_engine=docling` 时，OCR 由 Docling + RapidOCR 完成。
+- PNG/JPG/JPEG image inputs are treated as one-page documents; `ocr_mode=auto/full` can use RapidOCR to extract text while preserving the original image asset.
 - `layout_engine=ppstructure` 时，OCR 和版面解析都由 PP-StructureV3 服务完成。
 - `layout_engine=auto` 时，由系统自动判断使用 Docling 还是 PP-StructureV3。
 
@@ -73,6 +75,7 @@ v1.2 对外只暴露两个核心参数，避免调用方配置过多。
 - RapidOCR 模型以外置模型目录形式提供。
 - 后续可以服务端配置 PaddleOCR 作为 Docling OCR 后端，但 v1.2 第一阶段不开放给 API 调用方。
 
+- PNG and JPG/JPEG inputs use the built-in image converter instead of Docling; the converter preserves the image and optionally runs RapidOCR.
 ### 4.2 `layout_engine=ppstructure`
 
 使用 PP-StructureV3 独立服务作为解析后端。
@@ -93,6 +96,7 @@ v1.2 对外只暴露两个核心参数，避免调用方配置过多。
 ### 4.3 `layout_engine=auto`
 
 系统自动选择解析路线。
+- PNG/JPG/JPEG inputs are routed to the image converter: `ocr_mode=off` preserves only the image, while `auto/full` adds RapidOCR text.
 
 第一阶段建议规则：
 

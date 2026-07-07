@@ -16,3 +16,4 @@ tmp/
 .pytest_tmp*/
 pytest-cache-files-*/
 .tmp/tests/
+.test/

@@ -134,7 +134,7 @@
           "documents"
         ],
         "summary": "Convert Document",
-        "description": "同步转换文档。成功响应中的 metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。PP-StructureV3 路线可返回页级行号和附件映射，Docling PDF 路线当前主要提供 page_count。",
+        "description": "同步转换文档。成功响应中的 metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。PP-StructureV3 路线可返回页级行号和附件映射，Docling PDF 路线当前主要提供 page_count。 Supported image inputs: .png, .jpg, .jpeg. Image inputs are single-page documents; image assets are preserved and OCR text is supplementary.",
         "operationId": "convert_document_api_documents_convert_post",
         "requestBody": {
           "content": {
@@ -719,7 +719,7 @@
           "tasks"
         ],
         "summary": "Create Conversion Task",
-        "description": "创建异步转换任务。任务成功后的 result.metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。",
+        "description": "创建异步转换任务。任务成功后的 result.metadata.pages 提供原始页码信息；Markdown 本身为连续文本，不保证分页。 Supported image inputs: .png, .jpg, .jpeg. Image inputs are single-page documents; image assets are preserved and OCR text is supplementary.",
         "operationId": "create_conversion_task_api_tasks_convert_post",
         "requestBody": {
           "content": {
@@ -1146,7 +1146,8 @@
                 "type": "null"
               }
             ],
-            "title": "File"
+            "title": "File",
+            "description": "Upload file. Supported formats: PDF, DOCX, PPTX, XLSX, CSV, TXT, HTML/HTM, Markdown/MD, PNG, JPG/JPEG. PNG/JPG/JPEG are processed as single-page image documents; the original image is preserved as an asset and RapidOCR can append text when ocr_mode is auto or full."
           },
           "ocr_mode": {
             "anyOf": [
@@ -1186,7 +1187,8 @@
                 "type": "null"
               }
             ],
-            "title": "File"
+            "title": "File",
+            "description": "Upload file. Supported formats: PDF, DOCX, PPTX, XLSX, CSV, TXT, HTML/HTM, Markdown/MD, PNG, JPG/JPEG. PNG/JPG/JPEG are processed as single-page image documents; the original image is preserved as an asset and RapidOCR can append text when ocr_mode is auto or full."
           },
           "ocr_mode": {
             "anyOf": [

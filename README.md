@@ -4,7 +4,7 @@ DocumentToMarkdown 是一个基于 FastAPI 的文档转 Markdown 服务，适合
 
 当前 v1.2 能力：
 
-- 支持 PDF、DOCX、PPTX、XLSX、CSV、TXT、HTML、Markdown。
+- 支持 PDF、DOCX、PPTX、XLSX、CSV、TXT、HTML、Markdown、PNG、JPG/JPEG。
 - 支持同步转换接口和异步任务接口。
 - 开放 API 默认不鉴权，便于内网系统集成。
 - 管理页面 `/web` 和管理类 API 需要登录。
@@ -85,6 +85,7 @@ curl -X POST "http://127.0.0.1:9527/api/documents/convert" \
 - `ocr_mode=off`：不 OCR，保持普通电子文档转换行为。
 - `ocr_mode=auto`：默认自动判断，扫描 PDF 可走 OCR。
 - `ocr_mode=full`：强制 OCR，适合整份扫描件。
+- PNG/JPG/JPEG inputs are treated as single-page documents; the original image is always preserved as an asset, and `ocr_mode=auto/full` uses RapidOCR to append extracted image text.
 - `layout_engine=docling`：强制 Docling + RapidOCR。
 - `layout_engine=ppstructure`：强制 PP-StructureV3 独立服务，仅支持 PDF。
 - `layout_engine=auto`：自动选择 Docling 或 PP-StructureV3。

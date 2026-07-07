@@ -15,6 +15,9 @@ SUPPORTED_FILE_FORMATS: dict[str, str] = {
     ".txt": "txt",
     ".md": "markdown",
     ".markdown": "markdown",
+    ".png": "png",
+    ".jpg": "jpg",
+    ".jpeg": "jpeg",
 }
 
 MD5_PATTERN = re.compile(r"^[a-f0-9]{32}$")

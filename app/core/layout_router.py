@@ -11,6 +11,7 @@ from app.core.conversion_options import ConversionOptions
 PDF_PREFLIGHT_BYTES = 4 * 1024 * 1024
 PDF_IMAGE_MARKERS = (b"/Subtype /Image", b"/Subtype/Image")
 PDF_TEXT_MARKERS = (b"/Font", b"/ToUnicode")
+IMAGE_FORMATS = {"png", "jpg", "jpeg"}
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,13 @@ def decide_layout(
 ) -> LayoutDecision:
     if options.layout_engine == "ppstructure":
         return _decide_ppstructure(file_format)
+
+    if file_format in IMAGE_FORMATS:
+        return LayoutDecision(
+            actual_layout_engine="image",
+            ocr_applied=options.ocr_mode != "off",
+            reason="ocr_disabled" if options.ocr_mode == "off" else "image_ocr",
+        )
 
     if file_format != "pdf":
         return LayoutDecision(

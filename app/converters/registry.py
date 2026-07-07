@@ -2,6 +2,7 @@ from app.converters.base import ConversionError, Converter
 from app.converters.csv_converter import CsvConverter
 from app.converters.docling_converter import DoclingConverter
 from app.converters.html import HtmlConverter
+from app.converters.image_converter import ImageConverter
 from app.converters.markdown import MarkdownConverter
 from app.converters.ppstructure_converter import PPStructureConverter
 from app.converters.text import TxtConverter
@@ -20,6 +21,9 @@ def get_converter(file_format: str, layout_engine: str | None = None) -> Convert
         "csv": CsvConverter(),
         "xlsx": XlsxConverter(),
         "html": HtmlConverter(),
+        "png": ImageConverter("png"),
+        "jpg": ImageConverter("jpg"),
+        "jpeg": ImageConverter("jpeg"),
         "pdf": DoclingConverter("pdf"),
         "docx": DoclingConverter("docx"),
         "pptx": DoclingConverter("pptx"),

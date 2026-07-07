@@ -27,6 +27,7 @@
 | HTML | `.html`, `.htm` |
 | Text | `.txt` |
 | Markdown | `.md`, `.markdown` |
+| Image | `.png`, `.jpg`, `.jpeg` |
 
 ## 3. OCR 和版面参数
 
@@ -46,6 +47,7 @@
 - `layout_engine=auto`：自动选择 Docling 或 PP-StructureV3。
 - `layout_engine=docling`：强制 Docling 路线，PDF OCR 使用 RapidOCR。
 - `layout_engine=ppstructure`：强制 PP-StructureV3 路线，仅支持 PDF。
+- PNG/JPG/JPEG inputs are treated as single-page documents; the original image is always preserved as an asset. `ocr_mode=off` does not extract text, while `ocr_mode=auto/full` uses RapidOCR to append image text.
 
 参数冲突：
 

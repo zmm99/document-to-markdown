@@ -11,6 +11,7 @@ v1.2 增加自动 OCR 和复杂扫描版面解析能力，同时保持 v1.1 已�
 - RapidOCR 作为 Docling 路线内置 OCR 能力，不作为 API 参数暴露。
 - PP-StructureV3 作为独立服务接入，定位为复杂版面解析后端，不是普通 OCR 引擎。
 - 所有结果归一到当前 `ConvertResult`、`result.md`、`metadata.json`、`assets/`。
+- Image inputs `.png`, `.jpg`, `.jpeg` use a dedicated image converter: copy the original image to `assets/`, emit a Markdown image reference, and optionally append RapidOCR text.
 - 模型文件外置挂载，镜像不内置大模型。
 
 ## 2. 当前代码评估
@@ -88,6 +89,7 @@ POST /api/tasks/convert
         v
 自动路由决策
         |
+        +-- image input (.png/.jpg/.jpeg) -> ImageConverter + optional RapidOCR
         +-- layout_engine=docling
         |      |
         |      v

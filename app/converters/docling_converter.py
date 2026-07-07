@@ -1,4 +1,3 @@
-from importlib import resources
 from pathlib import Path
 import re
 
@@ -6,15 +5,13 @@ from app.config import settings
 from app.converters.base import ConversionError, ConvertAsset, ConvertResult
 from app.converters.docx_converter import DocxConverter
 from app.core.conversion_options import ConversionOptions, parse_conversion_options
-
-
-RAPIDOCR_MODEL_FILES = {
-    "det_model_path": Path("onnx/PP-OCRv5/det/ch_PP-OCRv5_det_server.onnx"),
-    "cls_model_path": Path("onnx/PP-OCRv5/cls/ch_PP-LCNet_x1_0_textline_ori_cls_server.onnx"),
-    "rec_model_path": Path("onnx/PP-OCRv5/rec/ch_PP-OCRv5_rec_server.onnx"),
-}
-RAPIDOCR_MODEL_PROFILE = "PP-OCRv5-server-onnx"
-RAPIDOCR_BITMAP_AREA_THRESHOLD = 0.05
+from app.core.rapidocr_models import (
+    RAPIDOCR_BITMAP_AREA_THRESHOLD,
+    RAPIDOCR_MODEL_PROFILE,
+    rapidocr_model_paths,
+    rapidocr_params,
+    rapidocr_rec_keys_path,
+)
 
 
 class DoclingConverter:
@@ -240,21 +237,10 @@ class DoclingConverter:
         )
 
     def _rapidocr_options(self, options: ConversionOptions):
-        from rapidocr import ModelType, OCRVersion
         from docling.datamodel.pipeline_options import RapidOcrOptions
 
         model_paths = self._rapidocr_model_paths()
         rec_keys_path = self._rapidocr_rec_keys_path()
-        rapidocr_params = {
-            "Det.ocr_version": OCRVersion.PPOCRV5,
-            "Det.model_type": ModelType.SERVER,
-            "Cls.ocr_version": OCRVersion.PPOCRV5,
-            "Cls.model_type": ModelType.SERVER,
-            "Rec.ocr_version": OCRVersion.PPOCRV5,
-            "Rec.model_type": ModelType.SERVER,
-        }
-        if rec_keys_path is not None:
-            rapidocr_params["Rec.rec_keys_path"] = rec_keys_path
 
         return RapidOcrOptions(
             lang=["chinese"],
@@ -265,42 +251,11 @@ class DoclingConverter:
             cls_model_path=str(model_paths["cls_model_path"]),
             rec_model_path=str(model_paths["rec_model_path"]),
             rec_keys_path=rec_keys_path,
-            rapidocr_params=rapidocr_params,
+            rapidocr_params=rapidocr_params(),
         )
 
     def _rapidocr_model_paths(self) -> dict[str, Path]:
-        root = self._rapidocr_model_root()
-        if root is None or not root.exists():
-            raise ConversionError("ocr_model_missing", "RapidOCR model directory is not configured")
-
-        paths: dict[str, Path] = {}
-        for key, relative_path in RAPIDOCR_MODEL_FILES.items():
-            path = root / relative_path
-            if not path.exists():
-                matches = list(root.rglob(relative_path.name))
-                if matches:
-                    path = matches[0]
-            if not path.exists():
-                raise ConversionError(
-                    "ocr_model_missing",
-                    f"RapidOCR model file is missing: {relative_path.name}",
-                )
-            paths[key] = path.resolve()
-        return paths
-
-    def _rapidocr_model_root(self) -> Path | None:
-        if settings.rapidocr_model_path is not None:
-            return settings.rapidocr_model_path
-        local_models = Path("models") / "rapidocr"
-        if local_models.exists():
-            return local_models
-        return None
+        return rapidocr_model_paths()
 
     def _rapidocr_rec_keys_path(self) -> str | None:
-        try:
-            keys = resources.files("rapidocr").joinpath("models", "ppocrv5_dict.txt")
-        except (ModuleNotFoundError, AttributeError):
-            return None
-        if keys.is_file():
-            return str(keys)
-        return None
+        return rapidocr_rec_keys_path()
