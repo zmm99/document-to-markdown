@@ -414,7 +414,7 @@ function resolveMarkdownUrl(value, fileId, image = false) {
   if (/^(https?:|blob:)/i.test(rawUrl) || rawUrl.startsWith("/")) {
     return rawUrl;
   }
-  if (image && /^data:image\//i.test(rawUrl)) {
+  if (image && /^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,/i.test(rawUrl)) {
     return rawUrl;
   }
   if (!image && /^mailto:/i.test(rawUrl)) {
@@ -451,6 +451,98 @@ function renderHtmlImageTag(tag, fileId) {
   return `<img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" referrerpolicy="no-referrer"${
     width ? ` width="${escapeHtml(width)}"` : ""
   }${height ? ` height="${escapeHtml(height)}"` : ""}>`;
+}
+
+const markdownHtmlAllowedTags = new Set([
+  "a", "blockquote", "br", "code", "div", "em", "h1", "h2", "h3", "h4", "h5", "h6",
+  "hr", "img", "li", "ol", "p", "pre", "span", "strong", "table", "tbody", "td", "tfoot",
+  "th", "thead", "tr", "ul",
+]);
+
+const markdownHtmlDiscardTags = new Set([
+  "button", "embed", "form", "iframe", "input", "math", "object", "script", "style", "svg", "template",
+]);
+
+const markdownHtmlVoidTags = new Set(["br", "hr", "img"]);
+
+function htmlAlignmentClass(element) {
+  const style = element.getAttribute("style") || "";
+  const styleMatch = style.match(/(?:^|;)\s*text-align\s*:\s*(left|center|right)\s*(?:;|$)/i);
+  const alignment = (styleMatch?.[1] || element.getAttribute("align") || "").toLowerCase();
+  return ["left", "center", "right"].includes(alignment) ? ` markdown-align-${alignment}` : "";
+}
+
+function boundedTableSpan(element, name) {
+  const value = element.getAttribute(name) || "";
+  return /^(?:[1-9]|[1-9]\d|100)$/.test(value) ? value : "";
+}
+
+function sanitizeMarkdownHtmlNode(node, fileId) {
+  if (node.nodeType === 3) {
+    return escapeHtml(node.nodeValue || "");
+  }
+  if (node.nodeType !== 1) {
+    return "";
+  }
+
+  const tag = node.tagName.toLowerCase();
+  if (markdownHtmlDiscardTags.has(tag)) {
+    return "";
+  }
+
+  const children = Array.from(node.childNodes)
+    .map((child) => sanitizeMarkdownHtmlNode(child, fileId))
+    .join("");
+  if (!markdownHtmlAllowedTags.has(tag)) {
+    return children;
+  }
+  if (tag === "img") {
+    return renderHtmlImageTag(node.outerHTML, fileId);
+  }
+
+  let attributes = "";
+  if (["div", "p", "span", "td", "th"].includes(tag)) {
+    attributes += ` class="markdown-html${htmlAlignmentClass(node)}"`;
+  }
+  if (tag === "td" || tag === "th") {
+    const colspan = boundedTableSpan(node, "colspan");
+    const rowspan = boundedTableSpan(node, "rowspan");
+    attributes += colspan ? ` colspan="${colspan}"` : "";
+    attributes += rowspan ? ` rowspan="${rowspan}"` : "";
+  }
+  if (tag === "a") {
+    const href = resolveMarkdownUrl(node.getAttribute("href") || "", fileId, false);
+    attributes += ` href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"`;
+  }
+
+  if (tag === "table") {
+    return `<div class="markdown-table-wrap markdown-html-table"><table>${children}</table></div>`;
+  }
+  if (markdownHtmlVoidTags.has(tag)) {
+    return `<${tag}${attributes}>`;
+  }
+  return `<${tag}${attributes}>${children}</${tag}>`;
+}
+
+function sanitizeMarkdownHtml(html, fileId) {
+  const normalized = String(html || "").replace(/<\/?(?:html|body)\b[^>]*>/gi, "");
+  const documentFragment = new DOMParser().parseFromString(`<body>${normalized}</body>`, "text/html").body;
+  return Array.from(documentFragment.childNodes)
+    .map((node) => sanitizeMarkdownHtmlNode(node, fileId))
+    .join("");
+}
+
+function extractMarkdownHtmlBlocks(markdown, fileId) {
+  const blocks = [];
+  const source = String(markdown || "").replace(
+    /<div\b[^>]*>[\s\S]*?<\/div>|<table\b[^>]*>[\s\S]*?<\/table>|<html\b[^>]*>[\s\S]*?<\/html>|<body\b[^>]*>[\s\S]*?<\/body>/gi,
+    (html) => {
+      const token = `@@MDHTMLBLOCK${blocks.length}@@`;
+      blocks.push(sanitizeMarkdownHtml(html, fileId));
+      return `\n${token}\n`;
+    }
+  );
+  return { source, blocks };
 }
 
 function renderInlineMarkdown(text, fileId) {
@@ -513,6 +605,7 @@ function splitTableRow(line) {
 function isMarkdownBlockStart(line, nextLine) {
   const trimmed = line.trim();
   return (
+    /^@@MDHTMLBLOCK\d+@@$/.test(trimmed) ||
     /^#{1,6}\s+/.test(trimmed) ||
     /^```/.test(trimmed) ||
     /^>\s?/.test(trimmed) ||
@@ -524,7 +617,8 @@ function isMarkdownBlockStart(line, nextLine) {
 }
 
 function renderMarkdown(markdown, fileId) {
-  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  const extracted = extractMarkdownHtmlBlocks(String(markdown || "").replace(/\r\n/g, "\n"), fileId);
+  const lines = extracted.source.split("\n");
   const html = [];
   let index = 0;
 
@@ -532,6 +626,13 @@ function renderMarkdown(markdown, fileId) {
     const line = lines[index];
     const trimmed = line.trim();
     if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    const htmlBlock = trimmed.match(/^@@MDHTMLBLOCK(\d+)@@$/);
+    if (htmlBlock) {
+      html.push(extracted.blocks[Number(htmlBlock[1])] || "");
       index += 1;
       continue;
     }

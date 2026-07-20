@@ -586,6 +586,22 @@ tr.selected {
   display: inline-block;
 }
 
+.markdown-rendered .markdown-html-table {
+  margin: 12px 0;
+}
+
+.markdown-rendered .markdown-align-left {
+  text-align: left;
+}
+
+.markdown-rendered .markdown-align-center {
+  text-align: center;
+}
+
+.markdown-rendered .markdown-align-right {
+  text-align: right;
+}
+
 .markdown-rendered a {
   color: var(--primary);
 }
